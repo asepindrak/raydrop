@@ -157,7 +157,7 @@
           <option value="">-- Choose a LAN or WAN Peer --</option>
           {#each $contacts as peer}
             <option value={peer.device_id}>
-              {peer.alias_name} ({peer.network_type.toUpperCase()} • {peer.device_id})
+              {peer.is_own_device ? '[My Device] ' : ''}{peer.alias_name}{peer.user_email ? ` (${peer.user_email})` : ` (${peer.network_type.toUpperCase()})`}
             </option>
           {/each}
         </select>

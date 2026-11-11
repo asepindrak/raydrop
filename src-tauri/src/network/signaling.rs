@@ -11,14 +11,15 @@ use tokio_tungstenite::{connect_async, tungstenite::Message};
 use tracing::{info, warn};
 
 pub fn start_signaling_daemon(app: AppHandle, state: Arc<AppState>) {
-    tokio::spawn(async move {
+    tauri::async_runtime::spawn(async move {
         loop {
-            let (sig_url, stun_addr, alias_name) = {
+            let (sig_url, stun_addr, alias_name, auth_token) = {
                 let s = state.settings.lock().unwrap();
                 (
                     s.signaling_url.clone(),
                     s.stun_addr.clone(),
                     s.alias_name.clone(),
+                    s.auth_token.clone(),
                 )
             };
 
@@ -57,12 +58,13 @@ pub fn start_signaling_daemon(app: AppHandle, state: Arc<AppState>) {
                         "alias_name": alias_name,
                         "ed25519_pubkey": state.identity.public_hex(),
                         "timestamp": ts,
-                        "signature": sig
+                        "signature": sig,
+                        "auth_token": auth_token
                     })
                     .to_string();
                     let _ = tx.send(reg_msg);
 
-                    // Query online status of all saved WAN contacts
+                    // Query online status of all saved contacts
                     if let Ok(contacts) = state.db.list_contacts() {
                         for c in contacts {
                             let lookup = json!({
@@ -114,6 +116,9 @@ async fn handle_signaling_message(app: &AppHandle, state: &Arc<AppState>, text: 
     };
 
     match msg_type {
+        "CLOUD_STATE_CHANGED" => {
+            let _ = app.emit("cloud_state_changed", ());
+        }
         "PEER_STATUS" => {
             if let (Some(device_id), Some(is_online)) = (
                 val.get("device_id").and_then(|v| v.as_str()),
@@ -216,4 +221,3 @@ async fn handle_signaling_message(app: &AppHandle, state: &Arc<AppState>, text: 
         _ => {}
     }
 }
-

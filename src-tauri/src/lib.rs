@@ -162,13 +162,31 @@ pub fn run() {
                     }
                 });
 
-            if let Some(icon) = app.default_window_icon() {
+            if let Ok(tray_img) =
+                tauri::image::Image::from_bytes(include_bytes!("../icons/32x32.png"))
+            {
+                tray_builder = tray_builder.icon(tray_img);
+            } else if let Some(icon) = app.default_window_icon() {
                 tray_builder = tray_builder.icon(icon.clone());
             }
             let _ = tray_builder.build(app)?;
 
-            // Minimize to System Tray on window close instead of exiting background daemon
+            // Auto-register OS Right-Click Context Menu ("Send with Raydrop") on startup
+            match crate::os::register_context_menu() {
+                Ok(msg) => info!("{msg}"),
+                Err(e) => info!("OS Context Menu registration skipped: {e}"),
+            }
+
+            // Show & focus main window on startup, set window icon, and minimize to System Tray on close
             if let Some(main_win) = app.get_webview_window("main") {
+                if let Ok(win_img) =
+                    tauri::image::Image::from_bytes(include_bytes!("../icons/128x128.png"))
+                {
+                    let _ = main_win.set_icon(win_img);
+                }
+                let _ = main_win.show();
+                let _ = main_win.unminimize();
+                let _ = main_win.set_focus();
                 let win_clone = main_win.clone();
                 main_win.on_window_event(move |event| {
                     if let WindowEvent::CloseRequested { api, .. } = event {
@@ -187,6 +205,10 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             commands::get_app_state,
+            commands::save_cloud_session,
+            commands::logout_cloud_session,
+            commands::sync_cloud_data_to_local,
+            commands::delete_local_contact,
             commands::toggle_discoverability,
             commands::update_settings,
             commands::get_contacts,

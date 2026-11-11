@@ -10,6 +10,10 @@ use std::time::{SystemTime, UNIX_EPOCH};
 pub struct Contact {
     pub device_id: String,
     pub alias_name: String,
+    pub user_email: Option<String>,
+    pub user_name: Option<String>,
+    pub os_type: Option<String>,
+    pub is_own_device: bool,
     pub ed25519_pubkey: Option<String>,
     pub network_type: String, // "lan" or "wan"
     pub last_known_ip: Option<String>,
@@ -39,6 +43,10 @@ pub struct TransferRecord {
 pub struct AppSettings {
     pub device_id: String,
     pub alias_name: String,
+    pub user_id: Option<String>,
+    pub user_email: Option<String>,
+    pub user_name: Option<String>,
+    pub auth_token: Option<String>,
     pub discoverable: bool,
     pub download_dir: String,
     pub signaling_url: String,
@@ -76,6 +84,10 @@ impl Database {
             CREATE TABLE IF NOT EXISTS contacts (
                 device_id TEXT PRIMARY KEY,
                 alias_name TEXT NOT NULL,
+                user_email TEXT,
+                user_name TEXT,
+                os_type TEXT,
+                is_own_device INTEGER DEFAULT 0,
                 ed25519_pubkey TEXT,
                 network_type TEXT NOT NULL,
                 last_known_ip TEXT,
@@ -103,6 +115,15 @@ impl Database {
         )
         .map_err(|e| e.to_string())?;
 
+        // Migrate existing contacts table if needed (add new columns gracefully)
+        let _ = conn.execute("ALTER TABLE contacts ADD COLUMN user_email TEXT", []);
+        let _ = conn.execute("ALTER TABLE contacts ADD COLUMN user_name TEXT", []);
+        let _ = conn.execute("ALTER TABLE contacts ADD COLUMN os_type TEXT", []);
+        let _ = conn.execute(
+            "ALTER TABLE contacts ADD COLUMN is_own_device INTEGER DEFAULT 0",
+            [],
+        );
+
         let db = Self {
             conn: Mutex::new(conn),
         };
@@ -129,6 +150,11 @@ impl Database {
                 default_alias
             }
         };
+
+        let user_id = db.get_setting("user_id")?.filter(|s| !s.is_empty());
+        let user_email = db.get_setting("user_email")?.filter(|s| !s.is_empty());
+        let user_name = db.get_setting("user_name")?.filter(|s| !s.is_empty());
+        let auth_token = db.get_setting("auth_token")?.filter(|s| !s.is_empty());
 
         let discoverable = match db.get_setting("discoverable")? {
             Some(v) => v == "true",
@@ -173,6 +199,10 @@ impl Database {
         let settings = AppSettings {
             device_id: identity.device_id.clone(),
             alias_name,
+            user_id,
+            user_email,
+            user_name,
+            auth_token,
             discoverable,
             download_dir,
             signaling_url,
@@ -208,20 +238,30 @@ impl Database {
         let conn = self.conn.lock().map_err(|e| e.to_string())?;
         conn.execute(
             "INSERT INTO contacts (
-                device_id, alias_name, ed25519_pubkey, network_type,
-                last_known_ip, last_known_port, trust_level, is_online, last_seen_at, created_at
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
+                device_id, alias_name, user_email, user_name, os_type, is_own_device,
+                ed25519_pubkey, network_type, last_known_ip, last_known_port,
+                trust_level, is_online, last_seen_at, created_at
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)
             ON CONFLICT(device_id) DO UPDATE SET
                 alias_name = excluded.alias_name,
+                user_email = COALESCE(excluded.user_email, contacts.user_email),
+                user_name = COALESCE(excluded.user_name, contacts.user_name),
+                os_type = COALESCE(excluded.os_type, contacts.os_type),
+                is_own_device = excluded.is_own_device,
                 ed25519_pubkey = COALESCE(excluded.ed25519_pubkey, contacts.ed25519_pubkey),
                 network_type = excluded.network_type,
                 last_known_ip = COALESCE(excluded.last_known_ip, contacts.last_known_ip),
                 last_known_port = COALESCE(excluded.last_known_port, contacts.last_known_port),
+                trust_level = excluded.trust_level,
                 is_online = excluded.is_online,
                 last_seen_at = excluded.last_seen_at",
             params![
                 c.device_id,
                 c.alias_name,
+                c.user_email,
+                c.user_name,
+                c.os_type,
+                if c.is_own_device { 1 } else { 0 },
                 c.ed25519_pubkey,
                 c.network_type,
                 c.last_known_ip,
@@ -246,6 +286,37 @@ impl Database {
         Ok(())
     }
 
+    pub fn update_contact_trust_by_email(
+        &self,
+        user_email: &str,
+        trust_level: &str,
+    ) -> Result<(), String> {
+        let conn = self.conn.lock().map_err(|e| e.to_string())?;
+        conn.execute(
+            "UPDATE contacts SET trust_level = ?1 WHERE LOWER(user_email) = LOWER(?2)",
+            params![trust_level, user_email],
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    pub fn delete_contact_by_device_id(&self, device_id: &str) -> Result<(), String> {
+        let conn = self.conn.lock().map_err(|e| e.to_string())?;
+        conn.execute("DELETE FROM contacts WHERE device_id = ?1", params![device_id])
+            .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    pub fn delete_contacts_by_email(&self, email: &str) -> Result<(), String> {
+        let conn = self.conn.lock().map_err(|e| e.to_string())?;
+        conn.execute(
+            "DELETE FROM contacts WHERE LOWER(user_email) = LOWER(?1)",
+            params![email],
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
     pub fn update_contact_online(&self, device_id: &str, is_online: bool) -> Result<(), String> {
         let conn = self.conn.lock().map_err(|e| e.to_string())?;
         conn.execute(
@@ -259,22 +330,27 @@ impl Database {
     pub fn get_contact(&self, device_id: &str) -> Result<Option<Contact>, String> {
         let conn = self.conn.lock().map_err(|e| e.to_string())?;
         conn.query_row(
-            "SELECT device_id, alias_name, ed25519_pubkey, network_type, last_known_ip,
-                    last_known_port, trust_level, is_online, last_seen_at, created_at
+            "SELECT device_id, alias_name, user_email, user_name, os_type, is_own_device,
+                    ed25519_pubkey, network_type, last_known_ip, last_known_port,
+                    trust_level, is_online, last_seen_at, created_at
              FROM contacts WHERE device_id = ?1",
             params![device_id],
             |row| {
                 Ok(Contact {
                     device_id: row.get(0)?,
                     alias_name: row.get(1)?,
-                    ed25519_pubkey: row.get(2)?,
-                    network_type: row.get(3)?,
-                    last_known_ip: row.get(4)?,
-                    last_known_port: row.get::<_, Option<i64>>(5)?.map(|p| p as u16),
-                    trust_level: row.get(6)?,
-                    is_online: row.get::<_, i64>(7)? != 0,
-                    last_seen_at: row.get::<_, i64>(8)? as u64,
-                    created_at: row.get::<_, i64>(9)? as u64,
+                    user_email: row.get(2)?,
+                    user_name: row.get(3)?,
+                    os_type: row.get(4)?,
+                    is_own_device: row.get::<_, i64>(5).unwrap_or(0) != 0,
+                    ed25519_pubkey: row.get(6)?,
+                    network_type: row.get(7)?,
+                    last_known_ip: row.get(8)?,
+                    last_known_port: row.get::<_, Option<i64>>(9)?.map(|p| p as u16),
+                    trust_level: row.get(10)?,
+                    is_online: row.get::<_, i64>(11)? != 0,
+                    last_seen_at: row.get::<_, i64>(12)? as u64,
+                    created_at: row.get::<_, i64>(13)? as u64,
                 })
             },
         )
@@ -286,8 +362,9 @@ impl Database {
         let conn = self.conn.lock().map_err(|e| e.to_string())?;
         let mut stmt = conn
             .prepare(
-                "SELECT device_id, alias_name, ed25519_pubkey, network_type, last_known_ip,
-                        last_known_port, trust_level, is_online, last_seen_at, created_at
+                "SELECT device_id, alias_name, user_email, user_name, os_type, is_own_device,
+                        ed25519_pubkey, network_type, last_known_ip, last_known_port,
+                        trust_level, is_online, last_seen_at, created_at
                  FROM contacts ORDER BY is_online DESC, last_seen_at DESC",
             )
             .map_err(|e| e.to_string())?;
@@ -297,14 +374,18 @@ impl Database {
                 Ok(Contact {
                     device_id: row.get(0)?,
                     alias_name: row.get(1)?,
-                    ed25519_pubkey: row.get(2)?,
-                    network_type: row.get(3)?,
-                    last_known_ip: row.get(4)?,
-                    last_known_port: row.get::<_, Option<i64>>(5)?.map(|p| p as u16),
-                    trust_level: row.get(6)?,
-                    is_online: row.get::<_, i64>(7)? != 0,
-                    last_seen_at: row.get::<_, i64>(8)? as u64,
-                    created_at: row.get::<_, i64>(9)? as u64,
+                    user_email: row.get(2)?,
+                    user_name: row.get(3)?,
+                    os_type: row.get(4)?,
+                    is_own_device: row.get::<_, i64>(5).unwrap_or(0) != 0,
+                    ed25519_pubkey: row.get(6)?,
+                    network_type: row.get(7)?,
+                    last_known_ip: row.get(8)?,
+                    last_known_port: row.get::<_, Option<i64>>(9)?.map(|p| p as u16),
+                    trust_level: row.get(10)?,
+                    is_online: row.get::<_, i64>(11)? != 0,
+                    last_seen_at: row.get::<_, i64>(12)? as u64,
+                    created_at: row.get::<_, i64>(13)? as u64,
                 })
             })
             .map_err(|e| e.to_string())?;
@@ -380,4 +461,3 @@ impl Database {
         Ok(list)
     }
 }
-

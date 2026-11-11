@@ -8,7 +8,10 @@ services:
     environment:
       - SIGNAL_HTTP_ADDR=0.0.0.0:8080
       - SIGNAL_UDP_ADDR=0.0.0.0:3478
+      - SIGNAL_DB_PATH=/data/signal.db
       - RUST_LOG=info
+    volumes:
+      - raydrop_signal_data:/data
     ports:
       # Direct UDP port for STUN / NAT Public IP:Port Discovery (bypasses HTTP proxy)
       - "3478:3478/udp"
@@ -31,7 +34,9 @@ services:
       - "traefik.http.routers.raydrop-signal.service=raydrop-signal-svc"
       - "traefik.http.services.raydrop-signal-svc.loadbalancer.server.port=8080"
 
+volumes:
+  raydrop_signal_data:
+
 networks:
   dokploy-network:
     external: true
-

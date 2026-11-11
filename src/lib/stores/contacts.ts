@@ -7,7 +7,10 @@ export const lanContacts = derived(contacts, ($contacts) =>
   $contacts.filter((c) => c.network_type === 'lan')
 );
 
-export const wanContacts = derived(contacts, ($contacts) =>
-  $contacts.filter((c) => c.network_type === 'wan')
+export const ownDevicesContacts = derived(contacts, ($contacts) =>
+  $contacts.filter((c) => c.is_own_device)
 );
 
+export const wanContacts = derived(contacts, ($contacts) =>
+  $contacts.filter((c) => c.network_type === 'wan' && !c.is_own_device)
+);

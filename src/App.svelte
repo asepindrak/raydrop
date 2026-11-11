@@ -5,11 +5,16 @@
   import ActiveTransfers from './lib/components/ActiveTransfers.svelte';
   import TransferModal from './lib/components/TransferModal.svelte';
   import TraySettings from './lib/components/TraySettings.svelte';
+  import AuthModal from './lib/components/AuthModal.svelte';
   import {
     appSettings,
+    deviceCryptoMeta,
     networkInfo,
+    cloudMyDevices,
+    cloudContacts,
     incomingRequestQueue,
     cliQueuedFiles,
+    authModalOpen,
   } from './lib/stores/state';
   import { contacts } from './lib/stores/contacts';
   import {
@@ -19,14 +24,37 @@
   } from './lib/stores/transfers';
   import {
     raydropApi,
+    cloudApi,
+    getApiBaseUrl,
     type IncomingTransferEvent,
     type TransferProgressEvent,
     type TransferRecord,
   } from './lib/utils/tauri-ipc';
 
+  async function refreshCloudState(sigUrl: string, token: string | null) {
+    if (!token) return;
+    try {
+      const baseUrl = getApiBaseUrl(sigUrl);
+      const cloudState = await cloudApi.getState(baseUrl, token);
+      cloudMyDevices.set(cloudState.my_devices);
+      cloudContacts.set(cloudState.contacts);
+      const synced = await raydropApi.syncCloudDataToLocal(
+        cloudState.my_devices,
+        cloudState.contacts
+      );
+      contacts.set(synced);
+    } catch (e) {
+      console.warn('Cloud state sync failed:', e);
+    }
+  }
+
   onMount(async () => {
     const snap = await raydropApi.getAppState();
     appSettings.set(snap.settings);
+    deviceCryptoMeta.set({
+      ed25519Pubkey: snap.ed25519_pubkey,
+      osType: snap.os_type,
+    });
     networkInfo.set({
       localIp: snap.local_ip,
       listenPort: snap.listen_port,
@@ -40,6 +68,12 @@
     contacts.set(await raydropApi.getContacts());
     transfers.set(await raydropApi.getTransferHistory());
 
+    if (!snap.settings.auth_token) {
+      authModalOpen.set(true);
+    } else {
+      await refreshCloudState(snap.settings.signaling_url, snap.settings.auth_token);
+    }
+
     // Subscribe to real-time backend events
     await raydropApi.listenEvent('peer_discovered', async () => {
       contacts.set(await raydropApi.getContacts());
@@ -49,12 +83,19 @@
       contacts.set(await raydropApi.getContacts());
     });
 
+    await raydropApi.listenEvent('cloud_state_changed', async () => {
+      await refreshCloudState($appSettings.signaling_url, $appSettings.auth_token);
+    });
+
     await raydropApi.listenEvent<boolean>('discoverability_changed', (enabled) => {
       appSettings.update((s) => ({ ...s, discoverable: enabled }));
     });
 
-    await raydropApi.listenEvent<boolean>('signaling_status_changed', (connected) => {
+    await raydropApi.listenEvent<boolean>('signaling_status_changed', async (connected) => {
       networkInfo.update((n) => ({ ...n, signalingConnected: connected }));
+      if (connected && $appSettings.auth_token) {
+        await refreshCloudState($appSettings.signaling_url, $appSettings.auth_token);
+      }
     });
 
     await raydropApi.listenEvent<IncomingTransferEvent>(
@@ -98,5 +139,5 @@
 
   <TransferModal />
   <TraySettings />
+  <AuthModal />
 </div>
-

@@ -2,7 +2,7 @@ use crate::db::storage::{now_unix_secs, AppSettings, Contact, TransferRecord};
 use crate::network::transport::initiate_peer_transfer;
 use crate::os::register_context_menu;
 use crate::state::{AppState, IncomingRequestDecision};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::sync::{atomic::Ordering, Arc};
 use tauri::{AppHandle, State};
@@ -10,11 +10,33 @@ use tauri::{AppHandle, State};
 #[derive(Serialize)]
 pub struct AppStateSnapshot {
     pub settings: AppSettings,
+    pub ed25519_pubkey: String,
+    pub os_type: String,
     pub local_ip: String,
     pub listen_port: u16,
     pub wan_reflexive_addr: Option<String>,
     pub signaling_connected: bool,
     pub queued_cli_files: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CloudDeviceItem {
+    pub device_id: String,
+    pub user_email: String,
+    pub user_name: String,
+    pub device_name: String,
+    pub os_type: String,
+    pub ed25519_pubkey: String,
+    pub last_ip: Option<String>,
+    pub is_online: bool,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CloudContactItem {
+    pub email: String,
+    pub name: String,
+    pub trust_level: String,
+    pub devices: Vec<CloudDeviceItem>,
 }
 
 #[tauri::command]
@@ -37,12 +59,176 @@ pub fn get_app_state(state: State<'_, Arc<AppState>>) -> Result<AppStateSnapshot
 
     Ok(AppStateSnapshot {
         settings,
+        ed25519_pubkey: state.identity.public_hex(),
+        os_type: std::env::consts::OS.to_string(),
         local_ip: state.local_ip.clone(),
         listen_port: state.listen_port,
         wan_reflexive_addr,
         signaling_connected: state.is_signaling_connected(),
         queued_cli_files,
     })
+}
+
+#[tauri::command]
+pub fn save_cloud_session(
+    state: State<'_, Arc<AppState>>,
+    user_id: String,
+    user_email: String,
+    user_name: String,
+    auth_token: String,
+    device_name: Option<String>,
+) -> Result<AppSettings, String> {
+    state.db.set_setting("user_id", &user_id)?;
+    state.db.set_setting("user_email", &user_email)?;
+    state.db.set_setting("user_name", &user_name)?;
+    state.db.set_setting("auth_token", &auth_token)?;
+
+    let mut s = state.settings.lock().map_err(|e| e.to_string())?;
+    s.user_id = Some(user_id);
+    s.user_email = Some(user_email);
+    s.user_name = Some(user_name);
+    s.auth_token = Some(auth_token.clone());
+
+    if let Some(dn) = device_name {
+        let trimmed = dn.trim();
+        if !trimmed.is_empty() {
+            state.db.set_setting("alias_name", trimmed)?;
+            s.alias_name = trimmed.to_string();
+        }
+    }
+
+    // Re-send authenticated REGISTER packet over active signaling WebSocket
+    if let Some(tx) = state.signaling_tx.lock().unwrap().as_ref() {
+        let ts = now_unix_secs();
+        let sign_payload = format!("RAYDROP_REGISTER:{}:{ts}", state.identity.device_id);
+        let sig = state.identity.sign_message(sign_payload.as_bytes());
+        let reg_msg = json!({
+            "type": "REGISTER",
+            "device_id": state.identity.device_id,
+            "alias_name": s.alias_name,
+            "ed25519_pubkey": state.identity.public_hex(),
+            "timestamp": ts,
+            "signature": sig,
+            "auth_token": auth_token
+        })
+        .to_string();
+        let _ = tx.send(reg_msg);
+    }
+
+    Ok(s.clone())
+}
+
+#[tauri::command]
+pub fn logout_cloud_session(state: State<'_, Arc<AppState>>) -> Result<AppSettings, String> {
+    state.db.set_setting("user_id", "")?;
+    state.db.set_setting("user_email", "")?;
+    state.db.set_setting("user_name", "")?;
+    state.db.set_setting("auth_token", "")?;
+
+    let mut s = state.settings.lock().map_err(|e| e.to_string())?;
+    s.user_id = None;
+    s.user_email = None;
+    s.user_name = None;
+    s.auth_token = None;
+    Ok(s.clone())
+}
+
+#[tauri::command]
+pub fn sync_cloud_data_to_local(
+    state: State<'_, Arc<AppState>>,
+    my_devices: Vec<CloudDeviceItem>,
+    contacts: Vec<CloudContactItem>,
+) -> Result<Vec<Contact>, String> {
+    let now = now_unix_secs();
+
+    // 1. Upsert all other devices belonging to the user's own account (My Devices / Tailnet)
+    for dev in my_devices {
+        if dev.device_id == state.identity.device_id {
+            continue;
+        }
+        let existing = state.db.get_contact(&dev.device_id).ok().flatten();
+        let net_type = existing
+            .as_ref()
+            .map(|c| c.network_type.clone())
+            .unwrap_or_else(|| "wan".to_string());
+        let last_port = existing.as_ref().and_then(|c| c.last_known_port);
+        let last_ip = existing
+            .as_ref()
+            .and_then(|c| c.last_known_ip.clone())
+            .or(dev.last_ip);
+
+        let c = Contact {
+            device_id: dev.device_id,
+            alias_name: dev.device_name,
+            user_email: Some(dev.user_email),
+            user_name: Some(dev.user_name),
+            os_type: Some(dev.os_type),
+            is_own_device: true,
+            ed25519_pubkey: Some(dev.ed25519_pubkey),
+            network_type: net_type,
+            last_known_ip: last_ip,
+            last_known_port: last_port,
+            trust_level: "trusted_auto_accept".to_string(),
+            is_online: dev.is_online,
+            last_seen_at: now,
+            created_at: now,
+        };
+        let _ = state.db.upsert_contact(&c);
+    }
+
+    // 2. Upsert all devices belonging to saved Cloud Contacts
+    for contact_group in contacts {
+        for dev in contact_group.devices {
+            if dev.device_id == state.identity.device_id {
+                continue;
+            }
+            let existing = state.db.get_contact(&dev.device_id).ok().flatten();
+            let net_type = existing
+                .as_ref()
+                .map(|c| c.network_type.clone())
+                .unwrap_or_else(|| "wan".to_string());
+            let last_port = existing.as_ref().and_then(|c| c.last_known_port);
+            let last_ip = existing
+                .as_ref()
+                .and_then(|c| c.last_known_ip.clone())
+                .or(dev.last_ip);
+
+            let c = Contact {
+                device_id: dev.device_id,
+                alias_name: dev.device_name,
+                user_email: Some(contact_group.email.clone()),
+                user_name: Some(contact_group.name.clone()),
+                os_type: Some(dev.os_type),
+                is_own_device: false,
+                ed25519_pubkey: Some(dev.ed25519_pubkey),
+                network_type: net_type,
+                last_known_ip: last_ip,
+                last_known_port: last_port,
+                trust_level: contact_group.trust_level.clone(),
+                is_online: dev.is_online,
+                last_seen_at: now,
+                created_at: now,
+            };
+            let _ = state.db.upsert_contact(&c);
+        }
+    }
+
+    state.db.list_contacts()
+}
+
+#[tauri::command]
+pub fn delete_local_contact(
+    state: State<'_, Arc<AppState>>,
+    device_id: Option<String>,
+    email: Option<String>,
+) -> Result<(), String> {
+    if let Some(did) = device_id {
+        state.db.delete_contact_by_device_id(&did)?;
+    }
+    if let Some(em) = email {
+        state.db.delete_contacts_by_email(&em)?;
+    }
+    Ok(())
 }
 
 #[tauri::command]
@@ -130,6 +316,10 @@ pub fn add_wan_contact(
     let contact = Contact {
         device_id: clean_id.clone(),
         alias_name: alias_name.trim().to_string(),
+        user_email: None,
+        user_name: None,
+        os_type: None,
+        is_own_device: false,
         ed25519_pubkey: None,
         network_type: "wan".to_string(),
         last_known_ip,
@@ -141,7 +331,6 @@ pub fn add_wan_contact(
     };
     state.db.upsert_contact(&contact)?;
 
-    // Immediately query online status via signaling server if connected
     if let Some(tx) = state.signaling_tx.lock().unwrap().as_ref() {
         let lookup = json!({
             "type": "PEER_LOOKUP",
@@ -159,7 +348,14 @@ pub fn update_contact_trust(
     state: State<'_, Arc<AppState>>,
     device_id: String,
     trust_level: String,
+    user_email: Option<String>,
 ) -> Result<(), String> {
+    if let Some(email) = user_email {
+        if !email.trim().is_empty() {
+            state.db.update_contact_trust_by_email(&email, &trust_level)?;
+            return Ok(());
+        }
+    }
     state.db.update_contact_trust(&device_id, &trust_level)
 }
 
@@ -221,4 +417,3 @@ pub fn get_transfer_history(
 pub fn register_os_context_menu() -> Result<String, String> {
     register_context_menu()
 }
-

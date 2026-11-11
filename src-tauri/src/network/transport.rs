@@ -251,7 +251,7 @@ pub fn start_transport_listeners(app: AppHandle, state: Arc<AppState>) {
     // 1. Start Direct TCP Listener (LAN high-speed transport)
     let app_tcp = app.clone();
     let state_tcp = state.clone();
-    tokio::spawn(async move {
+    tauri::async_runtime::spawn(async move {
         let bind_addr = format!("0.0.0.0:{}", state_tcp.listen_port);
         match TcpListener::bind(&bind_addr).await {
             Ok(listener) => {
@@ -260,7 +260,7 @@ pub fn start_transport_listeners(app: AppHandle, state: Arc<AppState>) {
                     let _ = stream.set_nodelay(true);
                     let app_c = app_tcp.clone();
                     let state_c = state_tcp.clone();
-                    tokio::spawn(async move {
+                    tauri::async_runtime::spawn(async move {
                         let (reader, writer) = tokio::io::split(stream);
                         if let Err(e) = handle_incoming_stream(
                             app_c,
@@ -282,7 +282,7 @@ pub fn start_transport_listeners(app: AppHandle, state: Arc<AppState>) {
     });
 
     // 2. Start QUIC over UDP Listener (WAN NAT hole-punched & LAN QUIC transport)
-    tokio::spawn(async move {
+    tauri::async_runtime::spawn(async move {
         match build_quic_endpoints(state.listen_port) {
             Ok(endpoint) => {
                 info!(
@@ -292,7 +292,7 @@ pub fn start_transport_listeners(app: AppHandle, state: Arc<AppState>) {
                 while let Some(incoming) = endpoint.accept().await {
                     let app_c = app.clone();
                     let state_c = state.clone();
-                    tokio::spawn(async move {
+                    tauri::async_runtime::spawn(async move {
                         if let Ok(conn) = incoming.await {
                             let peer_addr = conn.remote_address();
                             if let Ok((send_stream, recv_stream)) = conn.accept_bi().await {
@@ -353,12 +353,20 @@ where
         &hello.signature,
     )?;
 
-    // Privacy Rule #2: Check Contact Trust Level
+    // Privacy Rule #2: Check Contact Trust Level (Own devices under same email auto-accept!)
     let existing_contact = state.db.get_contact(&hello.sender_device_id)?;
-    let trust_level = existing_contact
+    let is_own_device = existing_contact
         .as_ref()
-        .map(|c| c.trust_level.clone())
-        .unwrap_or_else(|| "ask".to_string());
+        .map(|c| c.is_own_device)
+        .unwrap_or(false);
+    let trust_level = if is_own_device {
+        "trusted_auto_accept".to_string()
+    } else {
+        existing_contact
+            .as_ref()
+            .map(|c| c.trust_level.clone())
+            .unwrap_or_else(|| "ask".to_string())
+    };
 
     if trust_level == "blocked" {
         info!("Blocked peer {} attempted connection", hello.sender_device_id);
@@ -369,6 +377,10 @@ where
     let contact = Contact {
         device_id: hello.sender_device_id.clone(),
         alias_name: hello.sender_alias.clone(),
+        user_email: existing_contact.as_ref().and_then(|c| c.user_email.clone()),
+        user_name: existing_contact.as_ref().and_then(|c| c.user_name.clone()),
+        os_type: existing_contact.as_ref().and_then(|c| c.os_type.clone()),
+        is_own_device,
         ed25519_pubkey: Some(hello.ed25519_pubkey.clone()),
         network_type: if network_route == "lan_direct" {
             "lan".to_string()
@@ -416,7 +428,7 @@ where
     let decision = if trust_level == "trusted_auto_accept" {
         IncomingRequestDecision {
             accepted: true,
-            target_directory: Some(default_dl),
+            target_directory: Some(default_dl.clone()),
         }
     } else {
         let (tx, rx) = oneshot::channel();
@@ -494,14 +506,14 @@ where
         if let Some(parent) = final_path.parent() {
             std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
         }
-        let part_Name = format!(
+        let part_name = format!(
             "{}.raypart",
             final_path
                 .file_name()
                 .and_then(|n| n.to_str())
                 .unwrap_or("file")
         );
-        let part_path = final_path.with_file_name(part_Name);
+        let part_path = final_path.with_file_name(part_name);
 
         let mut hasher = blake3::Hasher::new();
         let mut offset_bytes = 0u64;
@@ -807,7 +819,7 @@ pub async fn initiate_peer_transfer(
     let state_c = state.clone();
     let sid_c = session_id.clone();
 
-    tokio::spawn(async move {
+    tauri::async_runtime::spawn(async move {
         if let Err(e) = run_outgoing_session(
             app_c.clone(),
             state_c.clone(),
