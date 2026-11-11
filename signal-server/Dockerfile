@@ -1,11 +1,11 @@
-FROM rust:1.82-alpine AS builder
-RUN apk add --no-cache musl-dev
+FROM rust:alpine AS builder
+RUN apk add --no-cache build-base musl-dev
 WORKDIR /app
 COPY Cargo.toml ./
 COPY src ./src
 RUN cargo build --release
 
-FROM alpine:3.20
+FROM alpine:3.21
 RUN apk add --no-cache ca-certificates
 WORKDIR /app
 COPY --from=builder /app/target/release/raydrop-signal-server /usr/local/bin/raydrop-signal-server
