@@ -22,7 +22,7 @@ pub fn start_signaling_daemon(app: AppHandle, state: Arc<AppState>) {
                 )
             };
 
-            if sig_url.is_empty() || sig_url.contains("signal.example.com") {
+            if sig_url.trim().is_empty() {
                 state.signaling_connected.store(false, Ordering::Relaxed);
                 tokio::time::sleep(Duration::from_secs(5)).await;
                 continue;

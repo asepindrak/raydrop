@@ -6,8 +6,8 @@ export const appSettings = writable<AppSettings>({
   alias_name: 'Raydrop-Device',
   discoverable: true,
   download_dir: '',
-  signaling_url: 'wss://signal.example.com/ws',
-  stun_addr: 'signal.example.com:3478',
+  signaling_url: 'wss://raydrop.gapleh.online/ws',
+  stun_addr: 'raydrop.gapleh.online:3478',
 });
 
 export const networkInfo = writable<{

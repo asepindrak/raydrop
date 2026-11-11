@@ -153,18 +153,18 @@ impl Database {
         };
 
         let signaling_url = match db.get_setting("signaling_url")? {
-            Some(s) => s,
-            None => {
-                let def = "wss://signal.example.com/ws";
+            Some(s) if !s.contains("signal.example.com") => s,
+            _ => {
+                let def = "wss://raydrop.gapleh.online/ws";
                 db.set_setting("signaling_url", def)?;
                 def.to_string()
             }
         };
 
         let stun_addr = match db.get_setting("stun_addr")? {
-            Some(s) => s,
-            None => {
-                let def = "signal.example.com:3478";
+            Some(s) if !s.contains("signal.example.com") => s,
+            _ => {
+                let def = "raydrop.gapleh.online:3478";
                 db.set_setting("stun_addr", def)?;
                 def.to_string()
             }

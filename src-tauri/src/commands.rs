@@ -66,16 +66,34 @@ pub fn update_settings(
     signaling_url: String,
     stun_addr: String,
 ) -> Result<AppSettings, String> {
+    let resolved_stun = if stun_addr.trim().is_empty() {
+        let host = signaling_url
+            .trim()
+            .trim_start_matches("wss://")
+            .trim_start_matches("ws://")
+            .trim_start_matches("https://")
+            .trim_start_matches("http://")
+            .split('/')
+            .next()
+            .unwrap_or("raydrop.gapleh.online")
+            .split(':')
+            .next()
+            .unwrap_or("raydrop.gapleh.online");
+        format!("{host}:3478")
+    } else {
+        stun_addr.trim().to_string()
+    };
+
     state.db.set_setting("alias_name", &alias_name)?;
     state.db.set_setting("download_dir", &download_dir)?;
-    state.db.set_setting("signaling_url", &signaling_url)?;
-    state.db.set_setting("stun_addr", &stun_addr)?;
+    state.db.set_setting("signaling_url", signaling_url.trim())?;
+    state.db.set_setting("stun_addr", &resolved_stun)?;
 
     let mut s = state.settings.lock().map_err(|e| e.to_string())?;
     s.alias_name = alias_name;
     s.download_dir = download_dir;
-    s.signaling_url = signaling_url;
-    s.stun_addr = stun_addr;
+    s.signaling_url = signaling_url.trim().to_string();
+    s.stun_addr = resolved_stun;
     Ok(s.clone())
 }
 

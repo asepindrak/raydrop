@@ -1,14 +1,14 @@
 <script lang="ts">
-  import { open } from '@tauri-apps/plugin-dialog';
-  import { appSettings, settingsModalOpen } from '../stores/state';
-  import { raydropApi } from '../utils/tauri-ipc';
-  import { FolderOpen, Terminal, Save, X, CheckCircle2 } from 'lucide-svelte';
+  import { open } from "@tauri-apps/plugin-dialog";
+  import { appSettings, settingsModalOpen } from "../stores/state";
+  import { raydropApi } from "../utils/tauri-ipc";
+  import { FolderOpen, Terminal, Save, X, CheckCircle2 } from "lucide-svelte";
 
-  let aliasName = '';
-  let downloadDir = '';
-  let signalingUrl = '';
-  let stunAddr = '';
-  let statusBanner = '';
+  let aliasName = "";
+  let downloadDir = "";
+  let signalingUrl = "";
+  let stunAddr = "";
+  let statusBanner = "";
 
   $: if ($settingsModalOpen) {
     aliasName = $appSettings.alias_name;
@@ -22,9 +22,9 @@
       directory: true,
       multiple: false,
       defaultPath: downloadDir,
-      title: 'Select Default Download Directory',
+      title: "Select Default Download Directory",
     });
-    if (typeof dir === 'string') {
+    if (typeof dir === "string") {
       downloadDir = dir;
     }
   }
@@ -37,8 +37,9 @@
       stunAddr,
     });
     appSettings.set(updated);
-    statusBanner = 'Settings saved! Signaling client will reconnect automatically.';
-    setTimeout(() => (statusBanner = ''), 3000);
+    statusBanner =
+      "Settings saved! Signaling client will reconnect automatically.";
+    setTimeout(() => (statusBanner = ""), 3000);
   }
 
   async function handleRegisterContextMenu() {
@@ -52,13 +53,20 @@
 </script>
 
 {#if $settingsModalOpen}
-  <div class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-    <div class="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl">
-      <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+  <div
+    class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4"
+  >
+    <div
+      class="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl"
+    >
+      <div
+        class="flex items-center justify-between pb-3 border-b border-slate-800"
+      >
         <div>
           <h3 class="text-base font-bold text-white">Raydrop Configuration</h3>
           <p class="text-xs text-slate-400">
-            Configure Device Alias, Dokploy WAN Signaling/STUN endpoints, and OS Context Menus
+            Configure Device Alias, Dokploy WAN Signaling/STUN endpoints, and OS
+            Context Menus
           </p>
         </div>
         <button
@@ -71,7 +79,11 @@
 
       <div class="space-y-4 mt-4">
         <div>
-          <label for="setting-alias" class="block text-xs font-medium text-slate-300 mb-1">Device Alias Name</label>
+          <label
+            for="setting-alias"
+            class="block text-xs font-medium text-slate-300 mb-1"
+            >Device Alias Name</label
+          >
           <input
             id="setting-alias"
             type="text"
@@ -81,7 +93,10 @@
         </div>
 
         <div>
-          <label for="setting-dl-dir" class="block text-xs font-medium text-slate-300 mb-1">
+          <label
+            for="setting-dl-dir"
+            class="block text-xs font-medium text-slate-300 mb-1"
+          >
             Default Download Folder (Used for Auto-Accept & Default Prompt)
           </label>
           <div class="flex items-center gap-2">
@@ -103,37 +118,48 @@
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
-            <label for="setting-sig-url" class="block text-xs font-medium text-slate-300 mb-1">
+            <label
+              for="setting-sig-url"
+              class="block text-xs font-medium text-slate-300 mb-1"
+            >
               WAN Signaling WSS URL (Traefik)
             </label>
             <input
               id="setting-sig-url"
               type="text"
               bind:value={signalingUrl}
-              placeholder="wss://signal.yourdomain.com/ws"
+              placeholder="wss://raydrop.gapleh.online/ws"
               class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono text-cyan-300 focus:outline-none focus:border-cyan-500"
             />
           </div>
           <div>
-            <label for="setting-stun-addr" class="block text-xs font-medium text-slate-300 mb-1">
+            <label
+              for="setting-stun-addr"
+              class="block text-xs font-medium text-slate-300 mb-1"
+            >
               UDP STUN Server (Port 3478)
             </label>
             <input
               id="setting-stun-addr"
               type="text"
               bind:value={stunAddr}
-              placeholder="signal.yourdomain.com:3478"
+              placeholder="raydrop.gapleh.online:3478"
               class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono text-cyan-300 focus:outline-none focus:border-cyan-500"
             />
           </div>
         </div>
 
         <!-- OS Context Menu Integration -->
-        <div class="p-3.5 rounded-xl bg-slate-950/90 border border-slate-800 flex items-center justify-between gap-3">
+        <div
+          class="p-3.5 rounded-xl bg-slate-950/90 border border-slate-800 flex items-center justify-between gap-3"
+        >
           <div>
-            <p class="text-xs font-semibold text-slate-200">Native OS Right-Click Integration</p>
+            <p class="text-xs font-semibold text-slate-200">
+              Native OS Right-Click Integration
+            </p>
             <p class="text-[11px] text-slate-400">
-              Adds "Send with Raydrop" to Windows Explorer (Files, Folders & SendTo), Ubuntu Nautilus, or macOS Finder.
+              Adds "Send with Raydrop" to Windows Explorer (Files, Folders &
+              SendTo), Ubuntu Nautilus, or macOS Finder.
             </p>
           </div>
           <button
@@ -146,7 +172,9 @@
         </div>
 
         {#if statusBanner}
-          <div class="flex items-center gap-2 text-xs text-emerald-300 bg-emerald-500/10 border border-emerald-500/30 px-3 py-2 rounded-xl">
+          <div
+            class="flex items-center gap-2 text-xs text-emerald-300 bg-emerald-500/10 border border-emerald-500/30 px-3 py-2 rounded-xl"
+          >
             <CheckCircle2 class="w-4 h-4 shrink-0" />
             <span>{statusBanner}</span>
           </div>
@@ -171,4 +199,3 @@
     </div>
   </div>
 {/if}
-
