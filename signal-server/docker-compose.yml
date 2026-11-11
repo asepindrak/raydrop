@@ -17,10 +17,19 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=dokploy-network"
+      # HTTP (Port 80) -> Auto Redirect to HTTPS
+      - "traefik.http.middlewares.raydrop-https-redirect.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.raydrop-https-redirect.redirectscheme.permanent=true"
+      - "traefik.http.routers.raydrop-signal-web.rule=Host(`${SIGNAL_DOMAIN:-signal.example.com}`)"
+      - "traefik.http.routers.raydrop-signal-web.entrypoints=web"
+      - "traefik.http.routers.raydrop-signal-web.middlewares=raydrop-https-redirect"
+      # HTTPS & WSS (Port 443 via Let's Encrypt)
       - "traefik.http.routers.raydrop-signal.rule=Host(`${SIGNAL_DOMAIN:-signal.example.com}`)"
       - "traefik.http.routers.raydrop-signal.entrypoints=websecure"
+      - "traefik.http.routers.raydrop-signal.tls=true"
       - "traefik.http.routers.raydrop-signal.tls.certresolver=letsencrypt"
-      - "traefik.http.services.raydrop-signal.loadbalancer.server.port=8080"
+      - "traefik.http.routers.raydrop-signal.service=raydrop-signal-svc"
+      - "traefik.http.services.raydrop-signal-svc.loadbalancer.server.port=8080"
 
 networks:
   dokploy-network:
