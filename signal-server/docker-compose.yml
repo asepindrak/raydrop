@@ -1,0 +1,28 @@
+services:
+  raydrop-signal:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: raydrop-signal
+    restart: unless-stopped
+    environment:
+      - SIGNAL_HTTP_ADDR=0.0.0.0:8080
+      - SIGNAL_UDP_ADDR=0.0.0.0:3478
+      - RUST_LOG=info
+    ports:
+      # Direct UDP port for STUN / NAT Public IP:Port Discovery (bypasses HTTP proxy)
+      - "3478:3478/udp"
+    networks:
+      - dokploy-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=dokploy-network"
+      - "traefik.http.routers.raydrop-signal.rule=Host(`${SIGNAL_DOMAIN:-signal.example.com}`)"
+      - "traefik.http.routers.raydrop-signal.entrypoints=websecure"
+      - "traefik.http.routers.raydrop-signal.tls.certresolver=letsencrypt"
+      - "traefik.http.services.raydrop-signal.loadbalancer.server.port=8080"
+
+networks:
+  dokploy-network:
+    external: true
+

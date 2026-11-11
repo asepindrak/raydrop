@@ -1,0 +1,46 @@
+# Node / Frontend (Vite + Svelte)
+node_modules/
+dist/
+dist-ssr/
+.svelte-kit/
+*.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Rust / Tauri v2 Desktop & Signal Server
+target/
+src-tauri/target/
+src-tauri/gen/schemas/
+signal-server/target/
+**/*.rs.bk
+
+# Environment Variables (keep .env.example tracked)
+.env
+.env.*
+!.env.example
+signal-server/.env
+signal-server/.env.*
+!signal-server/.env.example
+
+# Raydrop Local Database & Partial Transfer Files
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.raypart
+
+# OS & Editor / IDE Files
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+

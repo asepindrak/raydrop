@@ -1,0 +1,56 @@
+[package]
+name = "raydrop"
+version = "1.0.0"
+description = "Universal Zero-Server P2P File Transfer System (LAN + WAN)"
+authors = ["Raydrop Team"]
+edition = "2021"
+
+[lib]
+name = "raydrop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.0.0", features = [] }
+
+[dependencies]
+tauri = { version = "2.1.0", features = ["tray-icon", "image-png"] }
+tauri-plugin-single-instance = "2.0.0"
+tauri-plugin-dialog = "2.0.0"
+tauri-plugin-fs = "2.0.0"
+tauri-plugin-notification = "2.0.0"
+tauri-plugin-process = "2.0.0"
+tauri-plugin-shell = "2.0.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1.41", features = ["full"] }
+tokio-util = { version = "0.7", features = ["codec", "io"] }
+tokio-tungstenite = { version = "0.24", features = ["rustls-tls-webpki-roots"] }
+futures-util = "0.3"
+quinn = "0.11"
+rustls = { version = "0.23", default-features = false, features = ["ring", "std"] }
+rcgen = "0.13"
+socket2 = { version = "0.5", features = ["all"] }
+mdns-sd = "0.11"
+rusqlite = { version = "0.32", features = ["bundled"] }
+blake3 = "1.5"
+chacha20poly1305 = "0.10"
+ed25519-dalek = { version = "2.1", features = ["rand_core"] }
+x25519-dalek = { version = "2.0", features = ["static_secrets"] }
+hkdf = "0.12"
+sha2 = "0.10"
+hex = "0.4"
+rand = "0.8"
+uuid = { version = "1.11", features = ["v4", "serde"] }
+tracing = "0.1"
+tracing-subscriber = "0.3"
+directories = "5.0"
+walkdir = "2.5"
+local-ip-address = "0.6"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+winreg = "0.52"
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]
+
