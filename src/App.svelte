@@ -273,6 +273,22 @@
     setTimeout(() => {
       checkForUpdates(false).catch(() => {});
     }, 2500);
+
+    // Periodically re-check for updates every 30 minutes while running in background/tray
+    const updateInterval = setInterval(() => {
+      checkForUpdates(false).catch(() => {});
+    }, 30 * 60 * 1000);
+
+    // Re-check whenever the user unhides or focuses the Raydrop window from tray
+    const handleWindowFocus = () => {
+      checkForUpdates(false).catch(() => {});
+    };
+    window.addEventListener("focus", handleWindowFocus);
+
+    return () => {
+      clearInterval(updateInterval);
+      window.removeEventListener("focus", handleWindowFocus);
+    };
   });
 </script>
 
