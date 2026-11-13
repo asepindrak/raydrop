@@ -274,14 +274,16 @@
   <Header />
 
   <!-- Main View: FULL width & height for Transfers & Streams, or active tab -->
-  <main class="flex-1 w-full p-4 overflow-hidden relative z-10">
-    {#if $activeMainTab === "transfers"}
+  <main class="flex-1 w-full p-4 overflow-hidden relative z-10 flex flex-col min-h-0">
+    <div class="h-full w-full {$activeMainTab === 'transfers' ? 'flex flex-col' : 'hidden'}">
       <ActiveTransfers />
-    {:else if $activeMainTab === "chat"}
+    </div>
+    <div class="h-full w-full {$activeMainTab === 'chat' ? 'flex flex-col' : 'hidden'}">
       <ChatView />
-    {:else}
+    </div>
+    <div class="h-full w-full {$activeMainTab !== 'transfers' && $activeMainTab !== 'chat' ? 'flex flex-col' : 'hidden'}">
       <ContactList />
-    {/if}
+    </div>
   </main>
 
   <!-- Fullscreen Drag & Drop Overlay Indicator -->

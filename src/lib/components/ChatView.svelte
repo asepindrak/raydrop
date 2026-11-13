@@ -93,18 +93,79 @@
     },
   ];
 
-  $: allPeers = [
-    ...$contacts.map((c) => ({
-      id: c.device_id,
-      name: c.alias_name || c.user_name || 'Raydrop Peer',
-      email: c.user_email || '',
-      osType: c.os_type || 'windows',
-      isOnline: c.is_online,
-      networkType: c.network_type || 'wan',
-      isOwnDevice: c.is_own_device,
-      trustLevel: c.trust_level || 'ask',
-    })),
-  ].filter((p, index, self) => index === self.findIndex((t) => t.id === p.id));
+  onMount(async () => {
+    try {
+      const loaded = await raydropApi.getContacts();
+      if (loaded && loaded.length > 0) {
+        contacts.set(loaded);
+      }
+    } catch (_) {}
+
+    if ($activeChatPeerId) {
+      await loadChatHistory($activeChatPeerId);
+      await tick();
+      scrollToBottom();
+    }
+  });
+
+  // Comprehensive Peer List: Combines local SQLite contacts, LAN mDNS, Cloud Devices & Contacts
+  $: allPeers = (() => {
+    const peerMap = new Map<string, any>();
+
+    for (const c of $contacts) {
+      peerMap.set(c.device_id, {
+        id: c.device_id,
+        name: c.alias_name || c.user_name || 'Raydrop Peer',
+        email: c.user_email || '',
+        osType: c.os_type || 'windows',
+        isOnline: c.is_online,
+        networkType: c.network_type || 'wan',
+        isOwnDevice: c.is_own_device,
+        trustLevel: c.trust_level || 'ask',
+      });
+    }
+
+    for (const dev of $cloudMyDevices) {
+      if (dev.device_id === $appSettings.device_id) continue;
+      if (!peerMap.has(dev.device_id)) {
+        peerMap.set(dev.device_id, {
+          id: dev.device_id,
+          name: dev.device_name || 'My Device',
+          email: dev.user_email || '',
+          osType: dev.os_type || 'windows',
+          isOnline: dev.is_online,
+          networkType: 'wan',
+          isOwnDevice: true,
+          trustLevel: 'trusted_auto_accept',
+        });
+      } else {
+        const existing = peerMap.get(dev.device_id);
+        existing.isOnline = existing.isOnline || dev.is_online;
+      }
+    }
+
+    for (const group of $cloudContacts) {
+      for (const dev of group.devices) {
+        if (!peerMap.has(dev.device_id)) {
+          peerMap.set(dev.device_id, {
+            id: dev.device_id,
+            name: group.name ? `${group.name} (${dev.device_name})` : dev.device_name,
+            email: group.email || '',
+            osType: dev.os_type || 'windows',
+            isOnline: dev.is_online,
+            networkType: 'wan',
+            isOwnDevice: false,
+            trustLevel: group.trust_level || 'ask',
+          });
+        } else {
+          const existing = peerMap.get(dev.device_id);
+          existing.isOnline = existing.isOnline || dev.is_online;
+        }
+      }
+    }
+
+    return Array.from(peerMap.values());
+  })();
 
   $: filteredPeers = allPeers.filter((p) => {
     if (!searchQuery.trim()) return true;
@@ -112,7 +173,22 @@
     return p.name.toLowerCase().includes(q) || p.email.toLowerCase().includes(q);
   });
 
-  $: activePeer = allPeers.find((p) => p.id === $activeChatPeerId) || null;
+  // Always resolve a valid activePeer if activeChatPeerId is selected to prevent blank screens
+  $: activePeer =
+    allPeers.find((p) => p.id === $activeChatPeerId) ||
+    ($activeChatPeerId
+      ? {
+          id: $activeChatPeerId,
+          name: `Peer (${$activeChatPeerId.slice(0, 10)}...)`,
+          email: '',
+          osType: 'windows',
+          isOnline: false,
+          networkType: 'wan',
+          isOwnDevice: false,
+          trustLevel: 'ask',
+        }
+      : filteredPeers[0] || null);
+
   $: activeMessages = ($activeChatPeerId ? $chatStore[$activeChatPeerId] : []) || [];
   $: hasMore = $activeChatPeerId ? !!$hasMoreMap[$activeChatPeerId] : false;
   $: isPeerBlocked = activePeer?.trustLevel === 'blocked';
@@ -130,7 +206,7 @@
   $: if ($activeChatPeerId && $activeChatPeerId !== prevPeerId) {
     prevPeerId = $activeChatPeerId;
     loadChatHistory($activeChatPeerId).then(() => {
-      scrollToBottom();
+      tick().then(() => scrollToBottom());
     });
   }
 
