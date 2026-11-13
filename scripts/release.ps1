@@ -1,4 +1,4 @@
-﻿# ==============================================================================
+# ==============================================================================
 # Raydrop Automated GitHub Release & Landing Page Sync Script
 # ==============================================================================
 # Usage:
@@ -139,3 +139,4 @@ Write-Host " Release $tag is LIVE!" -ForegroundColor Green
 Write-Host " GitHub: $($release.html_url)" -ForegroundColor Green
 Write-Host " Landing: https://raydrop.web.id (Auto-synced in real-time)" -ForegroundColor Green
 Write-Host "==========================================================" -ForegroundColor Green
+
