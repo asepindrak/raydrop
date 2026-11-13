@@ -1826,7 +1826,9 @@ where
 
             if resume_offset < entry.size_bytes {
                 let remaining_file_bytes = entry.size_bytes - resume_offset;
-                let worker_count = if remaining_file_bytes >= PARALLEL_THRESHOLD_BYTES {
+                let worker_count = if network_route == "wan_p2p" {
+                    2 // Keep worker count focused for WebSocket relay tunnel
+                } else if remaining_file_bytes >= PARALLEL_THRESHOLD_BYTES {
                     PARALLEL_WORKERS
                 } else {
                     1
@@ -1911,6 +1913,23 @@ where
                     if cancel_s.load(Ordering::Relaxed) {
                         let _ = stop_tx.try_send(());
                         return Err("Outgoing transfer paused/cancelled".to_string());
+                    }
+
+                    // Sliding Window Flow Control:
+                    // Prevent sender from overflowing the network buffer or relay server queue.
+                    // If in-flight bytes exceed window, pause until receiver's RECEIVER_PROGRESS ACK catches up.
+                    let max_in_flight: u64 = if network_route == "wan_p2p" {
+                        2 * 1024 * 1024 // 2 MB sliding window for WAN relay
+                    } else {
+                        8 * 1024 * 1024 // 8 MB sliding window for direct LAN
+                    };
+
+                    while has_ack_s.load(Ordering::Relaxed)
+                        && local_sent_bytes > acked_s.load(Ordering::Relaxed) + max_in_flight
+                        && !closed_s.load(Ordering::Relaxed)
+                        && !cancel_s.load(Ordering::Relaxed)
+                    {
+                        tokio::time::sleep(Duration::from_millis(15)).await;
                     }
 
                     let (header, ciphertext, plain_len) = match frame_res {
@@ -2036,6 +2055,18 @@ where
             tokio::time::sleep(Duration::from_millis(25)).await;
         }
         let _ = stop_tx.try_send(());
+
+        if !done_s.load(Ordering::SeqCst) {
+            let err_msg = if closed_s.load(Ordering::SeqCst) {
+                "Receiver disconnected before completing transfer"
+            } else if cancel_s.load(Ordering::Relaxed) {
+                "Transfer cancelled"
+            } else {
+                "Transfer timed out waiting for receiver verification"
+            };
+            return Err(err_msg.to_string());
+        }
+
         Ok::<(), String>(())
     };
 

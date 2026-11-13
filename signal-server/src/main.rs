@@ -27,7 +27,7 @@ use uuid::Uuid;
 
 const MAX_HTTP_BODY_BYTES: usize = 64 * 1024; // 64 KB max JSON body
 const MAX_WS_MESSAGE_BYTES: usize = 2 * 1024 * 1024; // 2 MB max WebSocket frame
-const PEER_CHANNEL_CAPACITY: usize = 256; // Bounded per-peer queue to prevent VPS OOM
+const PEER_CHANNEL_CAPACITY: usize = 1024; // Bounded per-peer queue to buffer high-throughput E2EE relay stream frames
 const AUTH_RATE_WINDOW_SECS: u64 = 300; // 5-minute window
 const MAX_AUTH_ATTEMPTS_PER_WINDOW: u32 = 10; // Max 10 failed login/register attempts per 5 mins per IP
 const AUTH_LOCKOUT_SECS: u64 = 600; // 10-minute temporary ban on brute-force
@@ -1351,16 +1351,18 @@ async fn handle_socket(socket: WebSocket, client_ip: String, state: ServerState)
                             continue;
                         }
                         if let Some(target) = state.peers.get(&target_device_id) {
-                            let _ = target.tx.try_send(
-                                json!({
-                                    "type": "RELAY_CONTROL",
-                                    "session_id": session_id,
-                                    "from_device_id": from_device_id,
-                                    "target_device_id": target_device_id,
-                                    "payload_json": payload_json
-                                })
-                                .to_string(),
-                            );
+                            let msg_str = json!({
+                                "type": "RELAY_CONTROL",
+                                "session_id": session_id,
+                                "from_device_id": from_device_id,
+                                "target_device_id": target_device_id,
+                                "payload_json": payload_json
+                            })
+                            .to_string();
+                            let target_tx = target.tx.clone();
+                            tokio::spawn(async move {
+                                let _ = tokio::time::timeout(std::time::Duration::from_secs(5), target_tx.send(msg_str)).await;
+                            });
                         }
                     }
                 }

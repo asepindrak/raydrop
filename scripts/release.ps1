@@ -8,9 +8,9 @@
 # This script:
 #   1. Reads version from package.json automatically
 #   2. Syncs version across tauri.conf.json, Cargo.toml, Svelte components & Landing (UTF-8 No BOM)
-#   3. Builds installer & portable binaries for the exact target version
+#   3. Builds installer binary for the exact target version
 #   4. Commits and pushes git changes & tags to GitHub
-#   5. Creates GitHub Release & uploads .msi and .exe binaries
+#   5. Creates GitHub Release & uploads .msi installer binary
 #   6. Landing page (raydrop.web.id) updates in real-time via GitHub API
 # ==============================================================================
 
@@ -85,7 +85,6 @@ $landingHtmlPath = "$repoRoot/landing/index.html"
 if (Test-Path $landingHtmlPath) {
     $landingContent = Read-Utf8 $landingHtmlPath
     $landingContent = $landingContent -replace 'Raydrop_[\d\.]+_x64_en-US\.msi', "Raydrop_${ver}_x64_en-US.msi"
-    $landingContent = $landingContent -replace 'Raydrop_[\d\.]+_x64-portable\.exe', "Raydrop_${ver}_x64-portable.exe"
     $landingContent = $landingContent -replace 'download/v[\d\.]+/Raydrop', "download/$tag/Raydrop"
     $landingContent = $landingContent -replace 'Raydrop v[\d\.]+ Released', "Raydrop $tag Released"
     Write-Utf8NoBom $landingHtmlPath $landingContent
@@ -93,15 +92,14 @@ if (Test-Path $landingHtmlPath) {
 
 # 3. Verify / Compile Artifacts
 $msiPath = "$repoRoot/src-tauri/target/release/bundle/msi/Raydrop_${ver}_x64_en-US.msi"
-$exePath = "$repoRoot/src-tauri/target/release/raydrop.exe"
 
-if (-not (Test-Path $msiPath) -or -not (Test-Path $exePath)) {
+if (-not (Test-Path $msiPath)) {
     Write-Host "Building release binaries for $tag..." -ForegroundColor Yellow
     npm run tauri build
 }
 
-if (-not (Test-Path $msiPath) -or -not (Test-Path $exePath)) {
-    Write-Error "Build output missing. Expected:`n  $msiPath`n  $exePath"
+if (-not (Test-Path $msiPath)) {
+    Write-Error "Build output missing. Expected:`n  $msiPath"
 }
 
 # 4. Get GitHub Credentials
@@ -138,10 +136,10 @@ $bodyText = @"
 </p>
 
 ### Download (Windows 64-bit / x64)
-- **Windows Setup Installer (`.msi` — Recommended):** \`Raydrop_${ver}_x64_en-US.msi\`
-- **Windows Portable App (`.exe` — Standalone / No Install):** \`Raydrop_${ver}_x64-portable.exe\`
+- **Windows Setup Installer (`.msi`):** \`Raydrop_${ver}_x64_en-US.msi\`
 
 ### Features & Highlights
+- **Sliding-Window Flow Control for WAN Relay:** Fixed progress stalling at ~39% on large files over WAN relay tunnel. Implemented sender in-flight sliding window flow control to prevent buffer overflows, tuned worker concurrency, and added strict receiver BLAKE3 completion verification.
 - **Auto-Incremental Duplicate File Downloads:** Sending a file with a name that was previously downloaded now automatically appends a clean increment number (`filename (1).ext`, `filename (2).ext`), preventing overwrite/false completion and ensuring newly sent files always download seamlessly.
 - **Ultra-Fast Realtime File Receive Popup:** Eliminated synchronous blocking STUN discovery from handshake path and added parallel concurrent Happy Eyeballs candidate race, making incoming transfer request modals appear instantaneously in real-time.
 - **Markdown Formatted Release Notes:** In-app update notifications and release dialogs now render rich markdown styling (headings, lists, code blocks, links) with automatic external browser launching.
@@ -189,8 +187,7 @@ foreach ($asset in $release.assets) {
 # 8. Upload Assets
 $uploadUrlBase = $release.upload_url -replace '\{\?name,label\}$', ''
 $uploads = @(
-    @{ Path = $msiPath; Name = "Raydrop_${ver}_x64_en-US.msi" },
-    @{ Path = $exePath; Name = "Raydrop_${ver}_x64-portable.exe" }
+    @{ Path = $msiPath; Name = "Raydrop_${ver}_x64_en-US.msi" }
 )
 
 foreach ($u in $uploads) {

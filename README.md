@@ -106,10 +106,9 @@ Pre-built binaries for **Windows (64-bit / x64)** are available on the [GitHub R
 
 | Package | Format | Description |
 | :--- | :---: | :--- |
-| **Windows Installer** | `.msi` | **Recommended:** Installs desktop shortcuts, start menu entry, and Windows Explorer context menu integration. |
-| **Portable Executable** | `.exe` | Standalone portable binary that runs immediately without installation. |
+| **Windows Installer** | `.msi` | Official Windows installer with desktop shortcuts, system tray, and Windows Explorer context menu integration. |
 
-👉 **[Download the Latest Release (v1.2.0)](https://github.com/asepindrak/raydrop/releases/latest)**
+👉 **[Download the Latest Release (v1.2.1)](https://github.com/asepindrak/raydrop/releases/latest)**
 
 ---
 

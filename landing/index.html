@@ -727,13 +727,11 @@
     /* Download Section */
     .download-grid {
       display: grid;
-      grid-template-columns: repeat(2, 1fr);
+      grid-template-columns: minmax(0, 520px);
+      justify-content: center;
       gap: 24px;
       max-width: 840px;
       margin: 0 auto;
-    }
-    @media (max-width: 680px) {
-      .download-grid { grid-template-columns: 1fr; }
     }
     .dl-card {
       padding: 36px 30px;
@@ -1167,30 +1165,6 @@
               <span id="msiVersion">Version v1.1.1</span>
             </div>
           </div>
-
-          <!-- Portable EXE -->
-          <div class="dl-card">
-            <div class="dl-head">
-              <div>
-                <div class="dl-title">Windows Portable (.exe)</div>
-                <div class="dl-desc" data-i18n="dl_exe_desc">Run immediately without installation. Great for USB drives or quick use on any PC.</div>
-              </div>
-            </div>
-
-            <a href="https://github.com/asepindrak/raydrop/releases/latest" id="dlExeBtn" class="btn btn-ghost btn-large">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                <polyline points="7 10 12 15 17 10"></polyline>
-                <line x1="12" y1="15" x2="12" y2="3"></line>
-              </svg>
-              <span>Download Portable (.exe)</span>
-            </a>
-
-            <div class="dl-meta">
-              <span id="exeSize">Size: ~24.4 MB</span>
-              <span id="exeVersion">Version v1.1.1</span>
-            </div>
-          </div>
         </div>
 
         <div style="text-align: center; margin-top: 36px; font-size: 14px; color: var(--muted);">
@@ -1468,11 +1442,8 @@
         document.getElementById('badgeText').innerText = translations[currentLang].badge_prefix + currentTag + translations[currentLang].badge_suffix;
         document.getElementById('heroReleaseVer').innerText = currentTag;
         document.getElementById('msiVersion').innerText = (currentLang === 'id' ? 'Versi ' : 'Version ') + currentTag;
-        document.getElementById('exeVersion').innerText = (currentLang === 'id' ? 'Versi ' : 'Version ') + currentTag;
-
         // Find assets
         let msiAsset = data.assets.find(a => a.name.endsWith('.msi'));
-        let exeAsset = data.assets.find(a => a.name.endsWith('.exe'));
 
         if (msiAsset) {
           const msiBtn = document.getElementById('dlMsiBtn');
@@ -1480,13 +1451,6 @@
           document.getElementById('primaryHeroDlBtn').href = msiAsset.browser_download_url;
           const msiMb = (msiAsset.size / (1024 * 1024)).toFixed(1);
           document.getElementById('msiSize').innerText = (currentLang === 'id' ? 'Ukuran: ' : 'Size: ') + msiMb + ' MB';
-        }
-
-        if (exeAsset) {
-          const exeBtn = document.getElementById('dlExeBtn');
-          exeBtn.href = exeAsset.browser_download_url;
-          const exeMb = (exeAsset.size / (1024 * 1024)).toFixed(1);
-          document.getElementById('exeSize').innerText = (currentLang === 'id' ? 'Ukuran: ' : 'Size: ') + exeMb + ' MB';
         }
       } catch (err) {
         console.warn('Failed to fetch latest GitHub release:', err);
