@@ -276,6 +276,8 @@ pub fn run() {
             commands::cancel_transfer,
             commands::get_transfer_history,
             commands::register_os_context_menu,
+            commands::open_file_path,
+            commands::open_folder_path,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Raydrop Tauri application");

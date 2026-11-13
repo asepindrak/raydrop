@@ -478,3 +478,114 @@ pub fn get_transfer_history(
 pub fn register_os_context_menu() -> Result<String, String> {
     register_context_menu()
 }
+
+#[tauri::command]
+pub fn open_file_path(path: String) -> Result<(), String> {
+    let p = std::path::PathBuf::from(&path);
+    if !p.exists() {
+        return Err(format!("File atau folder tidak ditemukan: {path}"));
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        let win_path = p.to_string_lossy().replace('/', "\\");
+        std::process::Command::new("cmd")
+            .args(["/C", "start", "", &win_path])
+            .creation_flags(CREATE_NO_WINDOW)
+            .spawn()
+            .map_err(|e| format!("Gagal membuka file: {e}"))?;
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open")
+            .arg(&p)
+            .spawn()
+            .map_err(|e| format!("Gagal membuka file: {e}"))?;
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        std::process::Command::new("xdg-open")
+            .arg(&p)
+            .spawn()
+            .map_err(|e| format!("Gagal membuka file: {e}"))?;
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
+pub fn open_folder_path(path: String) -> Result<(), String> {
+    let p = std::path::PathBuf::from(&path);
+
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        if p.exists() && p.is_file() {
+            let win_path = p.to_string_lossy().replace('/', "\\");
+            std::process::Command::new("explorer.exe")
+                .raw_arg(format!("/select,\"{}\"", win_path))
+                .spawn()
+                .map_err(|e| format!("Gagal membuka folder: {e}"))?;
+            return Ok(());
+        }
+        let dir_to_open = if p.exists() && p.is_dir() {
+            p
+        } else if let Some(parent) = p.parent() {
+            if parent.exists() {
+                parent.to_path_buf()
+            } else {
+                return Err(format!("Folder tidak ditemukan: {path}"));
+            }
+        } else {
+            return Err(format!("Folder tidak ditemukan: {path}"));
+        };
+        let win_dir = dir_to_open.to_string_lossy().replace('/', "\\");
+        std::process::Command::new("explorer.exe")
+            .arg(&win_dir)
+            .spawn()
+            .map_err(|e| format!("Gagal membuka folder: {e}"))?;
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        if p.exists() && p.is_file() {
+            std::process::Command::new("open")
+                .args(["-R", &path])
+                .spawn()
+                .map_err(|e| format!("Gagal membuka folder: {e}"))?;
+            return Ok(());
+        }
+        let dir_to_open = if p.exists() && p.is_dir() {
+            p
+        } else if let Some(parent) = p.parent() {
+            parent.to_path_buf()
+        } else {
+            return Err(format!("Folder tidak ditemukan: {path}"));
+        };
+        std::process::Command::new("open")
+            .arg(&dir_to_open)
+            .spawn()
+            .map_err(|e| format!("Gagal membuka folder: {e}"))?;
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        let dir_to_open = if p.exists() && p.is_dir() {
+            p
+        } else if let Some(parent) = p.parent() {
+            parent.to_path_buf()
+        } else {
+            return Err(format!("Folder tidak ditemukan: {path}"));
+        };
+        std::process::Command::new("xdg-open")
+            .arg(&dir_to_open)
+            .spawn()
+            .map_err(|e| format!("Gagal membuka folder: {e}"))?;
+    }
+
+    Ok(())
+}

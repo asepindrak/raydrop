@@ -190,6 +190,8 @@ export const raydropApi = {
     invoke<void>('cancel_transfer', { sessionId }),
   getTransferHistory: () => invoke<TransferRecord[]>('get_transfer_history'),
   registerOsContextMenu: () => invoke<string>('register_os_context_menu'),
+  openFilePath: (path: string) => invoke<void>('open_file_path', { path }),
+  openFolderPath: (path: string) => invoke<void>('open_folder_path', { path }),
   listenEvent: <T>(event: string, handler: (payload: T) => void): Promise<UnlistenFn> =>
     listen<T>(event, (e) => handler(e.payload)),
 };

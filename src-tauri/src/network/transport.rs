@@ -658,11 +658,13 @@ where
     // Check existing `.raypart` or completed files for instant O(1) resume offset calculation
     let mut resume_offsets = Vec::new();
     let mut file_map: HashMap<u32, (PathBuf, PathBuf, u64)> = HashMap::new();
+    let mut downloaded_file_paths: Vec<String> = Vec::new();
     let mut already_received_bytes: u64 = 0;
 
     for f in &manifest.files {
         let rel = sanitize_relative_path(&f.relative_path)?;
         let final_path = target_root.join(&rel);
+        downloaded_file_paths.push(final_path.to_string_lossy().to_string());
         if let Some(parent) = final_path.parent() {
             std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
         }
@@ -745,7 +747,7 @@ where
         transferred_bytes: already_received_bytes,
         status: "in_progress".to_string(),
         target_path: Some(target_root.to_string_lossy().to_string()),
-        source_paths: None,
+        source_paths: serde_json::to_string(&downloaded_file_paths).ok(),
         created_at: now_unix_secs(),
     };
     let _ = state.db.upsert_transfer(&record);
