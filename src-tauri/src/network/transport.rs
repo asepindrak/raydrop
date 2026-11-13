@@ -752,6 +752,13 @@ where
                     let _ = std::fs::remove_file(&part_path);
                 }
             }
+        } else if final_path.exists() {
+            if let Ok(meta) = std::fs::metadata(&final_path) {
+                if meta.len() == f.size_bytes {
+                    offset_bytes = f.size_bytes;
+                    already_received_bytes += f.size_bytes;
+                }
+            }
         }
 
         resume_offsets.push(ResumeOffsetEntry {
@@ -768,6 +775,56 @@ where
         resume_offsets,
     };
     write_json_packet(&mut writer, &accept_resp).await?;
+
+    if already_received_bytes >= manifest.total_size_bytes {
+        info!("All files for session {} already completed on disk. Finalizing.", hello.session_id);
+        let _ = write_json_packet(
+            &mut writer,
+            &ReceiverProgressFrame {
+                frame_type: "RECEIVER_PROGRESS".to_string(),
+                session_id: hello.session_id.clone(),
+                transferred_bytes: manifest.total_size_bytes,
+                completed_files: manifest.total_files,
+                done: true,
+            },
+        )
+        .await;
+        let _ = writer.flush().await;
+
+        let record = TransferRecord {
+            id: hello.session_id.clone(),
+            peer_device_id: hello.sender_device_id.clone(),
+            peer_alias: hello.sender_alias.clone(),
+            direction: "incoming".to_string(),
+            network_route: network_route.clone(),
+            total_files: manifest.total_files,
+            total_bytes: manifest.total_size_bytes,
+            transferred_bytes: manifest.total_size_bytes,
+            status: "completed".to_string(),
+            target_path: Some(target_root.to_string_lossy().to_string()),
+            source_paths: serde_json::to_string(&downloaded_file_paths).ok(),
+            created_at: now_unix_secs(),
+        };
+        let _ = state.db.upsert_transfer(&record);
+        let _ = app.emit("transfer_state_changed", &record);
+        let _ = app.emit(
+            "transfer_progress",
+            &TransferProgressEvent {
+                session_id: record.id.clone(),
+                peer_device_id: record.peer_device_id.clone(),
+                peer_alias: record.peer_alias.clone(),
+                direction: "incoming".to_string(),
+                network_route: record.network_route.clone(),
+                transferred_bytes: record.total_bytes,
+                total_bytes: record.total_bytes,
+                speed_mbps: 0.0,
+                eta_seconds: 0,
+                status: "completed".to_string(),
+            },
+        );
+        tokio::time::sleep(Duration::from_millis(400)).await;
+        return Ok(());
+    }
 
     let cancel_flag = Arc::new(AtomicBool::new(false));
     state
@@ -1026,6 +1083,7 @@ where
             status: "completed".to_string(),
         },
     );
+    tokio::time::sleep(Duration::from_millis(400)).await;
     Ok(())
 }
 
@@ -1249,6 +1307,11 @@ async fn start_or_resume_transfer(
             {
                 Ok(()) => return,
                 Err(e) => {
+                    if let Ok(Some(rec)) = state_c.db.get_transfer(&sid_c) {
+                        if rec.status == "completed" {
+                            return;
+                        }
+                    }
                     if cancel_flag.load(Ordering::Relaxed) {
                         warn!("Outgoing transfer {sid_c} paused/cancelled by user.");
                         if let Ok(Some(mut rec)) = state_c.db.get_transfer(&sid_c) {
@@ -1930,14 +1993,6 @@ where
         return Err(e);
     }
 
-    if has_ack.load(Ordering::SeqCst) && !receiver_done.load(Ordering::SeqCst) {
-        record.transferred_bytes = acked_bytes.load(Ordering::SeqCst);
-        record.status = "paused".to_string();
-        let _ = state.db.upsert_transfer(&record);
-        let _ = app.emit("transfer_state_changed", &record);
-        return Err("Connection closed before receiver confirmed completion".to_string());
-    }
-
     state
         .active_cancellations
         .lock()
@@ -1963,6 +2018,7 @@ where
             status: "completed".to_string(),
         },
     );
+    tokio::time::sleep(Duration::from_millis(400)).await;
     Ok(())
 }
 

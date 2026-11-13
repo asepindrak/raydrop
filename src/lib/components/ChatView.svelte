@@ -873,7 +873,16 @@
                                 >
                                   Decline
                                 </button>
-                              {:else if localPath && linkedTransfer?.status === 'completed'}
+                              {:else if linkedTransfer?.status === 'paused' && isOutgoing}
+                                <button
+                                  type="button"
+                                  on:click={() => raydropApi.resumeTransfer(linkedTransfer.id)}
+                                  class="px-2.5 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-[11px] text-emerald-300 border border-emerald-500/40 font-bold transition"
+                                  title="Resume transfer"
+                                >
+                                  Resume
+                                </button>
+                              {:else if localPath && (linkedTransfer?.status === 'completed' || isOutgoing)}
                                 <button
                                   type="button"
                                   on:click={() => handleOpenFile(localPath)}
@@ -887,23 +896,6 @@
                                   on:click={() => handleOpenFolder(localPath)}
                                   class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-amber-300 border border-slate-700 transition"
                                   title="Locate in Containing Folder"
-                                >
-                                  <FolderOpen class="w-3.5 h-3.5" />
-                                </button>
-                              {:else if isOutgoing && localPath}
-                                <button
-                                  type="button"
-                                  on:click={() => handleOpenFile(localPath)}
-                                  class="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-[11px] text-slate-300 border border-slate-700 transition"
-                                  title="Open Local File"
-                                >
-                                  Open
-                                </button>
-                                <button
-                                  type="button"
-                                  on:click={() => handleOpenFolder(localPath)}
-                                  class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-amber-300 border border-slate-700 transition"
-                                  title="Locate in Folder"
                                 >
                                   <FolderOpen class="w-3.5 h-3.5" />
                                 </button>
@@ -924,7 +916,7 @@
                     </div>
 
                     <!-- Live Transfer Progress in Chat Bubble (Reactive) -->
-                    {#if linkedTransfer && (linkedTransfer.status === 'in_progress' || (linkedTransfer.total_bytes > 0 && linkedTransfer.transferred_bytes < linkedTransfer.total_bytes))}
+                    {#if linkedTransfer && linkedTransfer.status !== 'completed' && (linkedTransfer.status === 'in_progress' || (linkedTransfer.total_bytes > 0 && linkedTransfer.transferred_bytes < linkedTransfer.total_bytes))}
                       {@const totalBytes = linkedTransfer.total_bytes > 0 ? linkedTransfer.total_bytes : (files[0]?.size || 0)}
                       {@const transferredBytes = linkedTransfer.transferred_bytes || 0}
                       {@const pct = totalBytes > 0
