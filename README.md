@@ -21,7 +21,7 @@
 
 ---
 
-## 🌟 Overview
+## ðŸŒŸ Overview
 
 **Raydrop** is an open-source, privacy-first peer-to-peer (P2P) file transfer application built with **Tauri v2 (Rust + Svelte 5 + Tailwind CSS)**. 
 
@@ -31,56 +31,56 @@ Unlike traditional file-sharing services that upload your files to third-party c
 
 ---
 
-## ✨ Key Features
+## âœ¨ Key Features
 
-### 🚀 High-Speed & Resumable Transfer Engine
+### ðŸš€ High-Speed & Resumable Transfer Engine
 - **Parallel Multi-Segment Streaming (IDM-Style):** Uses up to 6 concurrent parallel chunk streams for large files to maximize bandwidth utilization across local networks and WAN connections.
 - **Resumable Transfers (`.raypart`):** If Wi-Fi disconnects or your PC sleeps, transfers seamlessly resume from where they stopped without re-downloading existing chunks from scratch.
 - **Streaming BLAKE3 Integrity Checks:** Files are verified on-the-fly using cryptographic BLAKE3 hashes to guarantee bit-perfect delivery.
 - **Zero-Latency Handshake:** Senders transmit the manifest instantly without pre-hashing bottlenecks.
 
-### 🔒 Zero-Knowledge & Privacy-First Architecture
+### ðŸ”’ Zero-Knowledge & Privacy-First Architecture
 - **Zero File Storage on Servers:** The signaling server **never** stores, buffers, inspects, or logs your files, file names, file sizes, or transfer histories.
 - **End-to-End Encryption (E2EE):** Every 512 KB chunk is encrypted with `ChaCha20-Poly1305` AEAD using ephemeral session keys negotiated via `X25519` Diffie-Hellman and `HKDF-SHA256` forward secrecy.
 - **Cryptographic Device Identities:** Each device generates an `Ed25519` keypair with a tamper-proof Device ID format (`RAY-XXXX-XXXX-XXXX`).
 - **Path Traversal Sanitization:** Incoming file paths are strictly sanitized to prevent directory traversal attacks (`../`).
 
-### 🌐 Dual-Mode Connectivity
+### ðŸŒ Dual-Mode Connectivity
 - **Local LAN Discovery (mDNS):** Automatically detects nearby devices on the same Wi-Fi/LAN via zero-config `_raydrop._tcp.local.`.
 - **Direct Internet WAN P2P (STUN / Hole-Punching):** Establishes direct P2P connections across NATs using a lightweight self-hosted STUN reflector and WebSocket signaling server.
 
-### 🖱️ Seamless Operating System Integration
+### ðŸ–±ï¸ Seamless Operating System Integration
 - **Windows Explorer Context Menu:** Right-click any file, folder, or multi-selection and click **"Send with Raydrop"** to instantly queue transfers into the running System Tray background instance.
 - **Auto-Focus Transfer Window:** Selecting files from the file manager automatically brings Raydrop to the foreground with an auto-focused contact selector for 1-click sending.
 - **Foreground Alert for Incoming Files:** Automatically raises the modal prompt on the recipient's screen when a transfer request arrives.
 
-### 📂 Rich Transfer Experience
+### ðŸ“‚ Rich Transfer Experience
 - **Direct File Navigation:** Open downloaded files immediately or open the containing folder with the specific file automatically highlighted and focused in Windows Explorer.
 - **Manifest Breakdown:** View full lists of received files, sizes, and folder trees.
 - **Transfer History & Filter Tabs:** Easily switch between **All**, **Received**, and **Sent** records with timestamps, transfer speeds, and progress indicators.
 
 ---
 
-## 🛡️ Security & Privacy Deep-Dive
+## ðŸ›¡ï¸ Security & Privacy Deep-Dive
 
 Raydrop is engineered specifically for users and organizations who require absolute data sovereignty and cannot allow file transfers to be tracked or logged by intermediary servers.
 
-### 🔍 Data Privacy Breakdown: What Is Stored Where?
+### ðŸ” Data Privacy Breakdown: What Is Stored Where?
 
 | Data Type | Signal Server (VPS) | Client Local SQLite (`storage.db`) |
 | :--- | :---: | :---: |
-| **File Contents** | ❌ **Never (0 bytes stored/routed)** | ✅ Saved to user's chosen download directory |
-| **File Names & Paths** | ❌ **Never tracked or stored** | ✅ Stored locally in recipient's private SQLite |
-| **File Sizes & Hashes** | ❌ **Never logged or tracked** | ✅ Stored locally in device transfer history |
-| **Transfer Logs & History** | ❌ **Zero server logs** | ✅ Kept 100% offline on the user's computer |
-| **User Account & Password** | ✅ Securely hashed (Argon2id / Salted SHA-256) | ✅ Cached auth token for sign-in |
-| **Registered Devices** | ✅ Device ID, name, OS, Ed25519 public key | ✅ Stored in local settings |
-| **Contacts & Trust Level** | ✅ Approved contact relationships | ✅ Synchronized contact list |
+| **File Contents** | âŒ **Never (0 bytes stored/routed)** | âœ… Saved to user's chosen download directory |
+| **File Names & Paths** | âŒ **Never tracked or stored** | âœ… Stored locally in recipient's private SQLite |
+| **File Sizes & Hashes** | âŒ **Never logged or tracked** | âœ… Stored locally in device transfer history |
+| **Transfer Logs & History** | âŒ **Zero server logs** | âœ… Kept 100% offline on the user's computer |
+| **User Account & Password** | âœ… Securely hashed (Argon2id / Salted SHA-256) | âœ… Cached auth token for sign-in |
+| **Registered Devices** | âœ… Device ID, name, OS, Ed25519 public key | âœ… Stored in local settings |
+| **Contacts & Trust Level** | âœ… Approved contact relationships | âœ… Synchronized contact list |
 
 > [!IMPORTANT]
 > **No File Tracking Guarantee:** The central VPS server functions solely as a matchmaking and signaling switchboard. When Device A sends files to Device B, the file manifest and file streams travel **directly between the two devices**. The server never parses, reads, or records what files are being transferred.
 
-### 🛡️ VPS Hardening & Anti-Brute-Force Safeguards
+### ðŸ›¡ï¸ VPS Hardening & Anti-Brute-Force Safeguards
 The Raydrop signaling server (`signal-server/`) is hardened against unauthorized access and denial-of-service:
 - **Rate-Limiting & Auto-Lockout:** Failed authentication attempts trigger exponential delays. Exceeding 10 failed attempts within 5 minutes results in an automatic 10-minute temporary IP ban.
 - **Timing Attack Mitigation:** Authentication tokens and password hashes are validated using constant-time byte comparisons (`constant_time_eq`).
@@ -89,7 +89,7 @@ The Raydrop signaling server (`signal-server/`) is hardened against unauthorized
 
 ---
 
-## 📥 Download
+## ðŸ“¥ Download
 
 Pre-built binaries for **Windows (64-bit / x64)** are available on the [GitHub Releases](https://github.com/asepindrak/raydrop/releases):
 
@@ -98,11 +98,11 @@ Pre-built binaries for **Windows (64-bit / x64)** are available on the [GitHub R
 | **Windows Installer** | `.msi` | **Recommended:** Installs desktop shortcuts, start menu entry, and Windows Explorer context menu integration. |
 | **Portable Executable** | `.exe` | Standalone portable binary that runs immediately without installation. |
 
-👉 **[Download the Latest Release (v1.1.0)](https://github.com/asepindrak/raydrop/releases/latest)**
+ðŸ‘‰ **[Download the Latest Release (v1.1.1)](https://github.com/asepindrak/raydrop/releases/latest)**
 
 ---
 
-## 🛠️ Architecture & Wire Protocol
+## ðŸ› ï¸ Architecture & Wire Protocol
 
 ```
 +-----------------------------------------------------------------------------------+
@@ -131,7 +131,7 @@ Pre-built binaries for **Windows (64-bit / x64)** are available on the [GitHub R
 
 ---
 
-## 🚀 Development & Self-Hosting
+## ðŸš€ Development & Self-Hosting
 
 ### 1. Self-Hosting the Signaling & STUN Server (`signal-server/`)
 
@@ -181,7 +181,7 @@ npm run tauri build
 
 ---
 
-## 🤝 Contributing
+## ðŸ¤ Contributing
 
 Contributions, bug reports, and feature suggestions are always welcome!
 1. Fork the repository.
@@ -192,6 +192,7 @@ Contributions, bug reports, and feature suggestions are always welcome!
 
 ---
 
-## 📄 License
+## ðŸ“„ License
 
 Raydrop is open-source software licensed under the [MIT License](LICENSE).
+

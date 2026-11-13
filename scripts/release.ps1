@@ -1,14 +1,15 @@
-# ==============================================================================
+﻿# ==============================================================================
 # Raydrop Automated GitHub Release & Landing Page Sync Script
 # ==============================================================================
 # Usage:
-#   powershell -ExecutionPolicy Bypass -File scripts/release.ps1
+#   npm run release
+#   or: powershell -ExecutionPolicy Bypass -File scripts/release.ps1
 #
 # This script:
 #   1. Reads version from package.json automatically
-#   2. Syncs fallback links in landing/index.html
-#   3. Builds installer & portable binaries if needed
-#   4. Pushes git commits & tags to GitHub
+#   2. Syncs version across tauri.conf.json, Cargo.toml, Svelte components & Landing (UTF-8 No BOM)
+#   3. Builds installer & portable binaries for the exact target version
+#   4. Commits and pushes git changes & tags to GitHub
 #   5. Creates GitHub Release & uploads .msi and .exe binaries
 #   6. Landing page (raydrop.web.id) updates in real-time via GitHub API
 # ==============================================================================
@@ -17,6 +18,11 @@ $ErrorActionPreference = "Stop"
 
 $repoRoot = (Get-Item $PSScriptRoot).Parent.FullName
 Set-Location $repoRoot
+
+function Write-Utf8NoBom($path, $text) {
+    $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+    [System.IO.File]::WriteAllText($path, $text, $utf8NoBom)
+}
 
 # 1. Read Version
 $pkgJson = Get-Content "$repoRoot/package.json" -Raw | ConvertFrom-Json
@@ -27,23 +33,66 @@ Write-Host "==========================================================" -Foregro
 Write-Host " Publishing Raydrop $tag Release to GitHub" -ForegroundColor Cyan
 Write-Host "==========================================================" -ForegroundColor Cyan
 
-# 2. Update landing/index.html fallback values
+# 2. Auto-sync version across all project files to prevent build mismatches
+Write-Host "Syncing version $ver across all project files..." -ForegroundColor Yellow
+
+# tauri.conf.json
+$tauriConfPath = "$repoRoot/src-tauri/tauri.conf.json"
+if (Test-Path $tauriConfPath) {
+    $tConf = Get-Content $tauriConfPath -Raw
+    $tConf = $tConf -replace '"version":\s*"[^"]+"', "`"version`": `"$ver`""
+    Write-Utf8NoBom $tauriConfPath $tConf
+}
+
+# Cargo.toml
+$cargoPath = "$repoRoot/src-tauri/Cargo.toml"
+if (Test-Path $cargoPath) {
+    $cContent = Get-Content $cargoPath -Raw
+    $cContent = $cContent -replace '(?m)^version\s*=\s*"[^"]+"', "version = `"$ver`""
+    Write-Utf8NoBom $cargoPath $cContent
+}
+
+# Header.svelte
+$headerPath = "$repoRoot/src/lib/components/Header.svelte"
+if (Test-Path $headerPath) {
+    $hContent = Get-Content $headerPath -Raw
+    $hContent = $hContent -replace 'v\d+\.\d+\.\d+', "v$ver"
+    Write-Utf8NoBom $headerPath $hContent
+}
+
+# TraySettings.svelte
+$settingsPath = "$repoRoot/src/lib/components/TraySettings.svelte"
+if (Test-Path $settingsPath) {
+    $sPath = Get-Content $settingsPath -Raw
+    $sPath = $sPath -replace 'Current:\s*v\d+\.\d+\.\d+', "Current: v$ver"
+    Write-Utf8NoBom $settingsPath $sPath
+}
+
+# README.md
+$readmePath = "$repoRoot/README.md"
+if (Test-Path $readmePath) {
+    $rContent = Get-Content $readmePath -Raw
+    $rContent = $rContent -replace 'Latest Release \(v[\d\.]+\)', "Latest Release ($tag)"
+    Write-Utf8NoBom $readmePath $rContent
+}
+
+# landing/index.html
 $landingHtmlPath = "$repoRoot/landing/index.html"
 if (Test-Path $landingHtmlPath) {
-    Write-Host "Syncing landing page static fallback to $tag..." -ForegroundColor Yellow
     $landingContent = Get-Content $landingHtmlPath -Raw
     $landingContent = $landingContent -replace 'Raydrop_[\d\.]+_x64_en-US\.msi', "Raydrop_${ver}_x64_en-US.msi"
     $landingContent = $landingContent -replace 'Raydrop_[\d\.]+_x64-portable\.exe', "Raydrop_${ver}_x64-portable.exe"
     $landingContent = $landingContent -replace 'download/v[\d\.]+/Raydrop', "download/$tag/Raydrop"
-    Set-Content -Path $landingHtmlPath -Value $landingContent -Encoding UTF8
+    $landingContent = $landingContent -replace 'Raydrop v[\d\.]+ Released', "Raydrop $tag Released"
+    Write-Utf8NoBom $landingHtmlPath $landingContent
 }
 
-# 3. Verify Artifacts
+# 3. Verify / Compile Artifacts
 $msiPath = "$repoRoot/src-tauri/target/release/bundle/msi/Raydrop_${ver}_x64_en-US.msi"
 $exePath = "$repoRoot/src-tauri/target/release/raydrop.exe"
 
-if (-not (Test-Path $msiPath)) {
-    Write-Host "Installer not found at $msiPath. Building now..." -ForegroundColor Yellow
+if (-not (Test-Path $msiPath) -or -not (Test-Path $exePath)) {
+    Write-Host "Building release binaries for $tag..." -ForegroundColor Yellow
     npm run tauri build
 }
 
@@ -69,7 +118,9 @@ $headers = @{
 $repo = "asepindrak/raydrop"
 
 # 5. Git Commit & Push Tag
-Write-Host "Ensuring git tag $tag is pushed..." -ForegroundColor Yellow
+Write-Host "Committing project version sync..." -ForegroundColor Yellow
+git add -A
+git commit -m "release: $tag" --allow-empty
 git tag -f $tag
 git push origin main
 git push origin $tag --force
@@ -93,7 +144,7 @@ $bodyText = @"
 - **End-to-End Cryptographic Security:** BLAKE3 checksums, X25519 ECDH key exchange, and ChaCha20-Poly1305.
 - **Windows 11 Native Context Menu:** Direct 1-click right-click integration on Windows Explorer.
 - **In-App Auto-Updater:** One-click seamless upgrade notification for all peers.
-- **Live Download Landing Page:** Automatically synced at [raydrop.web.id](https://raydrop.web.id).
+- **Live Download Landing Page:** Automatically synced in real-time at [raydrop.web.id](https://raydrop.web.id).
 "@
 
 # 7. Create or Get GitHub Release
@@ -139,4 +190,3 @@ Write-Host " Release $tag is LIVE!" -ForegroundColor Green
 Write-Host " GitHub: $($release.html_url)" -ForegroundColor Green
 Write-Host " Landing: https://raydrop.web.id (Auto-synced in real-time)" -ForegroundColor Green
 Write-Host "==========================================================" -ForegroundColor Green
-
