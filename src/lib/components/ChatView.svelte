@@ -35,7 +35,7 @@
     Image as ImageIcon
   } from 'lucide-svelte';
   import { contacts, lanContacts } from '../stores/contacts';
-  import { cloudContacts, cloudMyDevices, activeChatPeerId, appSettings } from '../stores/state';
+  import { cloudContacts, cloudMyDevices, activeChatPeerId, appSettings, incomingRequestQueue } from '../stores/state';
   import {
     chatStore,
     unreadCounts,
@@ -67,6 +67,19 @@
   let attachingFiles: string[] = [];
   let showEmojiPicker = false;
   let relativeTimeTicker = 0;
+  let localThumbnails: Record<string, string> = {};
+
+  async function ensureLocalThumbnail(path: string | null) {
+    if (!path || localThumbnails[path]) return;
+    try {
+      const thumb = await raydropApi.getFileThumbnail(path);
+      if (thumb) {
+        localThumbnails = { ...localThumbnails, [path]: thumb };
+      }
+    } catch (_) {
+      // ignore
+    }
+  }
 
   // Update relative time strings every 15 seconds
   const tickerInterval = setInterval(() => {
@@ -388,8 +401,8 @@
   }
 
   async function handleSendMessage() {
-    if (!$activeChatPeerId || isPeerBlocked) return;
-    const text = messageInput.trim();
+    if (!$activeChatPeerId || isPeerBlocked || isSending) return;
+    const text = (messageInput || '').trim();
     if (!text && attachingFiles.length === 0) return;
 
     isSending = true;
@@ -399,15 +412,17 @@
       let filesJson: string | null = null;
       let msgType = 'text';
 
-      if (attachingFiles.length > 0) {
+      const filesToAttach = [...attachingFiles];
+
+      if (filesToAttach.length > 0) {
         msgType = 'file_transfer';
         // 1. Initiate accelerated P2P transfer session in Raydrop backend
         transferSessionId = await raydropApi.initiateTransfer(
           $activeChatPeerId,
-          attachingFiles
+          filesToAttach
         );
 
-        const filesMeta: ChatFileItem[] = attachingFiles.map((fp) => ({
+        const filesMeta: ChatFileItem[] = filesToAttach.map((fp) => ({
           name: getBaseName(fp),
           size: 0,
           path: fp,
@@ -435,6 +450,28 @@
       console.error('Failed to send message:', err);
     } finally {
       isSending = false;
+    }
+  }
+
+  async function handleAcceptChatTransfer(sessionId: string) {
+    try {
+      await raydropApi.respondTransferRequest(
+        sessionId,
+        true,
+        $appSettings.download_dir
+      );
+      incomingRequestQueue.update((q) => q.filter((item) => item.session_id !== sessionId));
+    } catch (err) {
+      console.warn('Failed to accept transfer from chat:', err);
+    }
+  }
+
+  async function handleDeclineChatTransfer(sessionId: string) {
+    try {
+      await raydropApi.respondTransferRequest(sessionId, false, null);
+      incomingRequestQueue.update((q) => q.filter((item) => item.session_id !== sessionId));
+    } catch (err) {
+      console.warn('Failed to decline transfer from chat:', err);
     }
   }
 
@@ -717,7 +754,9 @@
           {#each activeMessages as msg (msg.id)}
             {@const isOutgoing = msg.direction === 'outgoing'}
             {@const files = parseFilesJson(msg.files_json)}
-            {@const linkedTransfer = msg.transfer_session_id ? transferMap.get(msg.transfer_session_id) : undefined}
+            {@const linkedTransfer = msg.transfer_session_id ? $transfers.find((t) => t.id === msg.transfer_session_id) : undefined}
+            {@const pendingRequest = msg.transfer_session_id ? $incomingRequestQueue.find((q) => q.session_id === msg.transfer_session_id) : undefined}
+            {@const hasContent = !!(msg.content && msg.content.trim().length > 0)}
 
             <div class="flex flex-col {isOutgoing ? 'items-end' : 'items-start'} group">
               <div
@@ -729,7 +768,7 @@
                 <button
                   type="button"
                   on:click={() => copyMessageText(msg.content, msg.id)}
-                  class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 p-1 rounded-md bg-slate-950/80 hover:bg-slate-800 text-slate-400 hover:text-cyan-300 border border-slate-800 transition-all cursor-pointer"
+                  class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 p-1 rounded-md bg-slate-950/80 hover:bg-slate-800 text-slate-400 hover:text-cyan-300 border border-slate-800 transition-all cursor-pointer z-10"
                   title="Copy message"
                 >
                   {#if copiedMessageId === msg.id}
@@ -740,21 +779,25 @@
                 </button>
 
                 <!-- Markdown Content -->
-                {#if msg.content}
-                  <div class="prose prose-invert prose-xs max-w-none text-slate-200 leading-relaxed font-sans break-words markdown-body">
+                {#if hasContent}
+                  <div class="text-slate-100 text-xs leading-relaxed font-sans break-words markdown-body select-text pr-6">
                     {@html renderMarkdown(msg.content)}
                   </div>
                 {/if}
 
                 <!-- Integrated File / Media Transfer Card -->
                 {#if files.length > 0}
-                  <div class="mt-2.5 space-y-2 pt-2 border-t border-slate-800/80">
+                  <div class="{hasContent ? 'mt-2.5 pt-2 border-t border-slate-800/80' : ''} space-y-2">
                     <div class="flex items-center justify-between text-[11px] font-mono text-slate-400">
                       <span class="flex items-center gap-1 text-cyan-300 font-semibold">
                         <Paperclip class="w-3 h-3 text-cyan-400" />
                         {files.length} Shared File(s)
                       </span>
-                      {#if linkedTransfer}
+                      {#if pendingRequest}
+                        <span class="text-[11px] font-semibold text-amber-400 animate-pulse">
+                          WAITING ACCEPT
+                        </span>
+                      {:else if linkedTransfer}
                         <span class="text-[11px] font-semibold {linkedTransfer.status === 'completed'
                           ? 'text-emerald-400'
                           : linkedTransfer.status === 'in_progress'
@@ -770,27 +813,30 @@
                         {@const badge = getFileTypeBadge(f.name)}
                         {@const localPath = resolveLocalFilePath(f, isOutgoing, linkedTransfer)}
                         {@const isImageFile = badge.isImage}
+                        {@const thumbSrc = f.thumbnail || (localPath ? localThumbnails[localPath] : null)}
 
                         <div class="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800/90 space-y-2">
-                          <!-- Direct In-Chat Image Preview -->
-                          {#if isImageFile && localPath}
-                            <!-- svelte-ignore a11y-click-events-have-key-events -->
-                            <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
-                            <div
-                              on:click={() => handleOpenFile(localPath)}
-                              class="rounded-lg overflow-hidden border border-slate-800/80 max-h-56 bg-slate-950 cursor-pointer hover:border-cyan-500/40 transition group/img relative"
-                              title="Click to view image"
-                            >
-                              <img
-                                src={convertFileSrc(localPath)}
-                                alt={f.name}
-                                class="w-full max-h-56 object-contain rounded-lg"
-                                on:error={(e) => {
-                                  // Fallback hide image element if unreadable or still downloading
-                                  e.currentTarget.style.display = 'none';
-                                }}
-                              />
-                            </div>
+                          <!-- Direct In-Chat Image Thumbnail Preview (Fast & Lightweight) -->
+                          {#if isImageFile}
+                            {#if thumbSrc}
+                              <!-- svelte-ignore a11y-click-events-have-key-events -->
+                              <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
+                              <div
+                                on:click={() => localPath && handleOpenFile(localPath)}
+                                class="rounded-lg overflow-hidden border border-slate-800/80 max-h-52 bg-slate-950 flex items-center justify-center {localPath ? 'cursor-pointer hover:border-cyan-500/40 transition group/img relative' : ''}"
+                                title={localPath ? 'Click to open full image' : 'Image preview thumbnail'}
+                              >
+                                <img
+                                  src={thumbSrc}
+                                  alt={f.name}
+                                  class="max-h-52 max-w-full object-contain rounded-lg shadow-sm"
+                                  loading="lazy"
+                                />
+                              </div>
+                            {:else if localPath}
+                              <!-- Trigger background local thumbnail load -->
+                              <span class="hidden">{ensureLocalThumbnail(localPath)}</span>
+                            {/if}
                           {/if}
 
                           <div class="flex items-center justify-between gap-2">
@@ -810,7 +856,24 @@
 
                             <!-- Action Buttons on File Card -->
                             <div class="flex items-center gap-1.5 shrink-0">
-                              {#if localPath}
+                              {#if pendingRequest}
+                                <button
+                                  type="button"
+                                  on:click={() => handleAcceptChatTransfer(pendingRequest.session_id)}
+                                  class="px-2.5 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-[11px] text-emerald-300 border border-emerald-500/40 font-bold transition shadow-sm"
+                                  title="Accept & Download"
+                                >
+                                  Accept
+                                </button>
+                                <button
+                                  type="button"
+                                  on:click={() => handleDeclineChatTransfer(pendingRequest.session_id)}
+                                  class="px-2 py-1 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-[11px] text-rose-300 border border-rose-500/40 transition"
+                                  title="Decline Transfer"
+                                >
+                                  Decline
+                                </button>
+                              {:else if localPath && linkedTransfer?.status === 'completed'}
                                 <button
                                   type="button"
                                   on:click={() => handleOpenFile(localPath)}
@@ -824,6 +887,23 @@
                                   on:click={() => handleOpenFolder(localPath)}
                                   class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-amber-300 border border-slate-700 transition"
                                   title="Locate in Containing Folder"
+                                >
+                                  <FolderOpen class="w-3.5 h-3.5" />
+                                </button>
+                              {:else if isOutgoing && localPath}
+                                <button
+                                  type="button"
+                                  on:click={() => handleOpenFile(localPath)}
+                                  class="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-[11px] text-slate-300 border border-slate-700 transition"
+                                  title="Open Local File"
+                                >
+                                  Open
+                                </button>
+                                <button
+                                  type="button"
+                                  on:click={() => handleOpenFolder(localPath)}
+                                  class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-amber-300 border border-slate-700 transition"
+                                  title="Locate in Folder"
                                 >
                                   <FolderOpen class="w-3.5 h-3.5" />
                                 </button>
@@ -845,8 +925,10 @@
 
                     <!-- Live Transfer Progress in Chat Bubble (Reactive) -->
                     {#if linkedTransfer && (linkedTransfer.status === 'in_progress' || (linkedTransfer.total_bytes > 0 && linkedTransfer.transferred_bytes < linkedTransfer.total_bytes))}
-                      {@const pct = linkedTransfer.total_bytes > 0
-                        ? Math.min(100, Math.round((linkedTransfer.transferred_bytes / linkedTransfer.total_bytes) * 100))
+                      {@const totalBytes = linkedTransfer.total_bytes > 0 ? linkedTransfer.total_bytes : (files[0]?.size || 0)}
+                      {@const transferredBytes = linkedTransfer.transferred_bytes || 0}
+                      {@const pct = totalBytes > 0
+                        ? Math.min(100, Math.round((transferredBytes / totalBytes) * 100))
                         : 0}
                       <div class="space-y-1 pt-1.5">
                         <div class="w-full h-2 rounded-full bg-slate-950 overflow-hidden border border-slate-800">
@@ -856,7 +938,7 @@
                           ></div>
                         </div>
                         <div class="flex items-center justify-between text-[10px] font-mono text-slate-400">
-                          <span>{pct}% ({formatBytes(linkedTransfer.transferred_bytes)} / {formatBytes(linkedTransfer.total_bytes)})</span>
+                          <span>{pct}% ({formatBytes(transferredBytes)} / {formatBytes(totalBytes)})</span>
                           <span class="text-cyan-400 font-bold">{(linkedTransfer.speed_mbps || 0).toFixed(1)} MB/s</span>
                         </div>
                       </div>

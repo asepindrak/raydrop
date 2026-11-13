@@ -1011,6 +1011,21 @@ where
     record.status = "completed".to_string();
     let _ = state.db.upsert_transfer(&record);
     let _ = app.emit("transfer_state_changed", &record);
+    let _ = app.emit(
+        "transfer_progress",
+        &TransferProgressEvent {
+            session_id: record.id.clone(),
+            peer_device_id: record.peer_device_id.clone(),
+            peer_alias: record.peer_alias.clone(),
+            direction: "incoming".to_string(),
+            network_route: record.network_route.clone(),
+            transferred_bytes: record.total_bytes,
+            total_bytes: record.total_bytes,
+            speed_mbps: 0.0,
+            eta_seconds: 0,
+            status: "completed".to_string(),
+        },
+    );
     Ok(())
 }
 
@@ -1933,6 +1948,21 @@ where
     record.status = "completed".to_string();
     let _ = state.db.upsert_transfer(&record);
     let _ = app.emit("transfer_state_changed", &record);
+    let _ = app.emit(
+        "transfer_progress",
+        &TransferProgressEvent {
+            session_id: record.id.clone(),
+            peer_device_id: record.peer_device_id.clone(),
+            peer_alias: record.peer_alias.clone(),
+            direction: "outgoing".to_string(),
+            network_route: record.network_route.clone(),
+            transferred_bytes: total_bytes,
+            total_bytes,
+            speed_mbps: 0.0,
+            eta_seconds: 0,
+            status: "completed".to_string(),
+        },
+    );
     Ok(())
 }
 

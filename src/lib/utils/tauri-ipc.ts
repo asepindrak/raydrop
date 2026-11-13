@@ -115,6 +115,7 @@ export interface ChatFileItem {
   name: string;
   size: number;
   path?: string;
+  thumbnail?: string;
 }
 
 export interface ChatMessage {
@@ -260,6 +261,8 @@ export const raydropApi = {
     invoke<Record<string, number>>('get_unread_chat_counts'),
   openExternalUrl: (url: string) =>
     invoke<void>('open_external_url', { url }),
+  getFileThumbnail: (path: string) =>
+    invoke<string>('get_file_thumbnail', { path }),
   listenEvent: <T>(event: string, handler: (payload: T) => void): Promise<UnlistenFn> =>
     listen<T>(event, (e) => handler(e.payload)),
 };

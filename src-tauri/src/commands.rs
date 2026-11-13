@@ -1001,6 +1001,32 @@ pub async fn download_and_install_update(
     }
 }
 
+use base64::Engine;
+use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
+
+pub fn generate_image_thumbnail(file_path: &str, max_width: u32, max_height: u32) -> Result<String, String> {
+    let path = std::path::Path::new(file_path);
+    if !path.exists() {
+        return Err("File not found".to_string());
+    }
+
+    let img = image::open(path).map_err(|e| format!("Failed to open image: {e}"))?;
+    let thumb = img.thumbnail(max_width, max_height);
+
+    let mut buf = std::io::Cursor::new(Vec::new());
+    thumb
+        .write_to(&mut buf, image::ImageFormat::Jpeg)
+        .map_err(|e| format!("Failed to encode JPEG: {e}"))?;
+
+    let encoded = BASE64_STANDARD.encode(buf.into_inner());
+    Ok(format!("data:image/jpeg;base64,{encoded}"))
+}
+
+#[tauri::command]
+pub fn get_file_thumbnail(path: String) -> Result<String, String> {
+    generate_image_thumbnail(&path, 320, 240)
+}
+
 #[tauri::command]
 pub fn send_chat_message(
     app: AppHandle,
@@ -1015,6 +1041,54 @@ pub fn send_chat_message(
     let msg_id = uuid::Uuid::new_v4().to_string();
     let effective_type = msg_type.unwrap_or_else(|| "text".to_string());
 
+    // Enrich files_json with real file size and fast lightweight thumbnails (max 300x220)
+    let enriched_files_json = if let Some(ref raw_json) = files_json {
+        if let Ok(mut items) = serde_json::from_str::<Vec<serde_json::Value>>(raw_json) {
+            for item in &mut items {
+                if let Some(obj) = item.as_object_mut() {
+                    let path_str = obj
+                        .get("path")
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string());
+                    let name_str = obj
+                        .get("name")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or_default()
+                        .to_lowercase();
+
+                    if let Some(ref p) = path_str {
+                        // 1. Populate real file size if missing or 0
+                        let current_size = obj.get("size").and_then(|v| v.as_u64()).unwrap_or(0);
+                        if current_size == 0 {
+                            if let Ok(meta) = std::fs::metadata(p) {
+                                obj.insert("size".to_string(), json!(meta.len()));
+                            }
+                        }
+
+                        // 2. Generate lightweight base64 thumbnail if it's an image
+                        let is_img = name_str.ends_with(".png")
+                            || name_str.ends_with(".jpg")
+                            || name_str.ends_with(".jpeg")
+                            || name_str.ends_with(".webp")
+                            || name_str.ends_with(".bmp")
+                            || name_str.ends_with(".gif");
+
+                        if is_img && obj.get("thumbnail").is_none() {
+                            if let Ok(thumb_data) = generate_image_thumbnail(p, 300, 220) {
+                                obj.insert("thumbnail".to_string(), json!(thumb_data));
+                            }
+                        }
+                    }
+                }
+            }
+            serde_json::to_string(&items).ok()
+        } else {
+            files_json.clone()
+        }
+    } else {
+        None
+    };
+
     let chat_msg = ChatMessage {
         id: msg_id.clone(),
         peer_device_id: peer_device_id.clone(),
@@ -1022,7 +1096,7 @@ pub fn send_chat_message(
         content: content.clone(),
         msg_type: effective_type.clone(),
         transfer_session_id: transfer_session_id.clone(),
-        files_json: files_json.clone(),
+        files_json: enriched_files_json.clone(),
         is_read: true,
         created_at: now,
     };
@@ -1034,7 +1108,7 @@ pub fn send_chat_message(
         "content": content,
         "msg_type": effective_type,
         "transfer_session_id": transfer_session_id,
-        "files_json": files_json,
+        "files_json": enriched_files_json,
         "from_alias": state.settings.lock().unwrap().alias_name,
         "created_at": now
     })
