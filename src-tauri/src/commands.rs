@@ -5,7 +5,7 @@ use crate::state::{AppState, IncomingRequestDecision};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::sync::{atomic::Ordering, Arc};
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 
 #[derive(Serialize)]
 pub struct AppStateSnapshot {
@@ -479,18 +479,96 @@ pub fn register_os_context_menu() -> Result<String, String> {
     register_context_menu()
 }
 
+#[cfg(target_os = "windows")]
+mod win_shell {
+    use std::ffi::OsStr;
+    use std::os::windows::ffi::OsStrExt;
+    use std::os::windows::process::CommandExt;
+    use std::path::Path;
+    use std::ptr;
+
+    #[link(name = "shell32")]
+    extern "system" {
+        fn ILCreateFromPathW(psz_path: *const u16) -> *mut std::ffi::c_void;
+        fn ILFree(pidl: *mut std::ffi::c_void);
+        fn SHOpenFolderAndSelectItems(
+            pidl_folder: *const std::ffi::c_void,
+            cidl: u32,
+            apidl: *const *const std::ffi::c_void,
+            dw_flags: u32,
+        ) -> i32;
+    }
+
+    #[link(name = "ole32")]
+    extern "system" {
+        fn CoInitializeEx(pv_reserved: *mut std::ffi::c_void, dw_co_init: u32) -> i32;
+    }
+
+    #[link(name = "user32")]
+    extern "system" {
+        fn AllowSetForegroundWindow(dw_process_id: u32) -> i32;
+    }
+
+    pub fn allow_foreground() {
+        unsafe {
+            let _ = AllowSetForegroundWindow(0xFFFF_FFFF);
+        }
+    }
+
+    pub fn reveal_and_select_file(path: &Path) -> Result<(), String> {
+        let canonical = std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
+        let clean_str = canonical
+            .to_string_lossy()
+            .trim_start_matches(r"\\?\")
+            .replace('/', r"\");
+        let wide: Vec<u16> = OsStr::new(&clean_str)
+            .encode_wide()
+            .chain(std::iter::once(0))
+            .collect();
+
+        unsafe {
+            let _ = AllowSetForegroundWindow(0xFFFF_FFFF);
+            let _ = CoInitializeEx(ptr::null_mut(), 0x2); // COINIT_APARTMENTTHREADED
+            let pidl = ILCreateFromPathW(wide.as_ptr());
+            if !pidl.is_null() {
+                let hr = SHOpenFolderAndSelectItems(pidl, 0, ptr::null(), 0);
+                ILFree(pidl);
+                if hr >= 0 {
+                    return Ok(());
+                }
+            }
+        }
+
+        // Fallback to explorer.exe /select,"<path>"
+        std::process::Command::new("explorer.exe")
+            .raw_arg(format!("/select,\"{}\"", clean_str))
+            .spawn()
+            .map_err(|e| format!("Gagal membuka folder: {e}"))?;
+        Ok(())
+    }
+}
+
 #[tauri::command]
-pub fn open_file_path(path: String) -> Result<(), String> {
+pub fn open_file_path(app: AppHandle, path: String) -> Result<(), String> {
     let p = std::path::PathBuf::from(&path);
     if !p.exists() {
         return Err(format!("File atau folder tidak ditemukan: {path}"));
+    }
+
+    if let Some(w) = app.get_webview_window("main") {
+        let _ = w.set_always_on_top(false);
     }
 
     #[cfg(target_os = "windows")]
     {
         use std::os::windows::process::CommandExt;
         const CREATE_NO_WINDOW: u32 = 0x08000000;
-        let win_path = p.to_string_lossy().replace('/', "\\");
+        win_shell::allow_foreground();
+        let canonical = std::fs::canonicalize(&p).unwrap_or_else(|_| p.clone());
+        let win_path = canonical
+            .to_string_lossy()
+            .trim_start_matches(r"\\?\")
+            .replace('/', "\\");
         std::process::Command::new("cmd")
             .args(["/C", "start", "", &win_path])
             .creation_flags(CREATE_NO_WINDOW)
@@ -518,22 +596,54 @@ pub fn open_file_path(path: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn open_folder_path(path: String) -> Result<(), String> {
+pub fn open_folder_path(app: AppHandle, path: String) -> Result<(), String> {
     let p = std::path::PathBuf::from(&path);
+
+    if let Some(w) = app.get_webview_window("main") {
+        let _ = w.set_always_on_top(false);
+    }
+
+    // If the file is still downloading/paused as `.raypart`, select the `.raypart` file in Explorer!
+    let target_item = if p.exists() {
+        Some(p.clone())
+    } else {
+        let part_candidate = p.with_file_name(format!(
+            "{}.raypart",
+            p.file_name().and_then(|n| n.to_str()).unwrap_or("file")
+        ));
+        if part_candidate.exists() {
+            Some(part_candidate)
+        } else {
+            None
+        }
+    };
 
     #[cfg(target_os = "windows")]
     {
-        use std::os::windows::process::CommandExt;
-        if p.exists() && p.is_file() {
-            let win_path = p.to_string_lossy().replace('/', "\\");
-            std::process::Command::new("explorer.exe")
-                .raw_arg(format!("/select,\"{}\"", win_path))
-                .spawn()
-                .map_err(|e| format!("Gagal membuka folder: {e}"))?;
-            return Ok(());
+        win_shell::allow_foreground();
+        if let Some(ref item) = target_item {
+            if item.is_file() {
+                let item_for_ui = item.clone();
+                let (tx, rx) = std::sync::mpsc::channel();
+                let _ = app.run_on_main_thread(move || {
+                    let res = win_shell::reveal_and_select_file(&item_for_ui);
+                    let _ = tx.send(res);
+                });
+                if let Ok(res) = rx.recv_timeout(std::time::Duration::from_secs(3)) {
+                    return res;
+                }
+                return win_shell::reveal_and_select_file(item);
+            }
         }
-        let dir_to_open = if p.exists() && p.is_dir() {
-            p
+
+        let dir_to_open = if let Some(ref item) = target_item {
+            if item.is_dir() {
+                item.clone()
+            } else if let Some(parent) = item.parent() {
+                parent.to_path_buf()
+            } else {
+                return Err(format!("Folder tidak ditemukan: {path}"));
+            }
         } else if let Some(parent) = p.parent() {
             if parent.exists() {
                 parent.to_path_buf()
@@ -543,7 +653,12 @@ pub fn open_folder_path(path: String) -> Result<(), String> {
         } else {
             return Err(format!("Folder tidak ditemukan: {path}"));
         };
-        let win_dir = dir_to_open.to_string_lossy().replace('/', "\\");
+
+        let canonical = std::fs::canonicalize(&dir_to_open).unwrap_or(dir_to_open);
+        let win_dir = canonical
+            .to_string_lossy()
+            .trim_start_matches(r"\\?\")
+            .replace('/', "\\");
         std::process::Command::new("explorer.exe")
             .arg(&win_dir)
             .spawn()
@@ -552,12 +667,15 @@ pub fn open_folder_path(path: String) -> Result<(), String> {
 
     #[cfg(target_os = "macos")]
     {
-        if p.exists() && p.is_file() {
-            std::process::Command::new("open")
-                .args(["-R", &path])
-                .spawn()
-                .map_err(|e| format!("Gagal membuka folder: {e}"))?;
-            return Ok(());
+        if let Some(ref item) = target_item {
+            if item.is_file() {
+                std::process::Command::new("open")
+                    .arg("-R")
+                    .arg(item)
+                    .spawn()
+                    .map_err(|e| format!("Gagal membuka folder: {e}"))?;
+                return Ok(());
+            }
         }
         let dir_to_open = if p.exists() && p.is_dir() {
             p
