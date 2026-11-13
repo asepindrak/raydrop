@@ -12,11 +12,11 @@ use std::sync::{
     Arc,
 };
 use std::time::{Duration, Instant, UNIX_EPOCH};
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 use tokio::fs::{File, OpenOptions};
-use tokio::io::{AsyncRead, AsyncReadExt, AsyncSeekExt, AsyncWrite, AsyncWriteExt};
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncSeekExt, AsyncWrite, AsyncWriteExt, DuplexStream, ReadHalf, WriteHalf};
 use tokio::net::{TcpListener, TcpStream};
-use tokio::sync::oneshot;
+use tokio::sync::{mpsc, oneshot};
 use tracing::{info, warn};
 use uuid::Uuid;
 use walkdir::WalkDir;
@@ -285,6 +285,7 @@ pub fn start_transport_listeners(app: AppHandle, state: Arc<AppState>) {
     tauri::async_runtime::spawn(async move {
         match build_quic_endpoints(state.listen_port) {
             Ok(endpoint) => {
+                *state.quic_endpoint.lock().unwrap() = Some(endpoint.clone());
                 info!(
                     "Raydrop QUIC/UDP transport listening on 0.0.0.0:{}",
                     state.listen_port
@@ -318,7 +319,92 @@ pub fn start_transport_listeners(app: AppHandle, state: Arc<AppState>) {
     });
 }
 
-async fn handle_incoming_stream<R, W>(
+/// Creates a virtual full-duplex `AsyncRead + AsyncWrite` stream bridged over `RELAY_CONTROL`
+/// WebSocket messages. All payload bytes written to this stream are already E2EE encrypted
+/// (Ed25519 + X25519 ECDH + ChaCha20-Poly1305 AEAD).
+pub(crate) fn create_ws_relay_stream(
+    state: Arc<AppState>,
+    session_id: String,
+    peer_device_id: String,
+) -> (ReadHalf<DuplexStream>, WriteHalf<DuplexStream>) {
+    let (local_stream, bridge_stream) = tokio::io::duplex(512 * 1024);
+    let (in_tx, mut in_rx) = mpsc::unbounded_channel::<Vec<u8>>();
+
+    state
+        .relay_streams
+        .lock()
+        .unwrap()
+        .insert(session_id.clone(), in_tx);
+
+    let (mut bridge_read, mut bridge_write) = tokio::io::split(bridge_stream);
+
+    // Pump inbound bytes received from signaling WebSocket into the local duplex reader
+    tauri::async_runtime::spawn(async move {
+        while let Some(bytes) = in_rx.recv().await {
+            if bytes.is_empty() {
+                let _ = bridge_write.shutdown().await;
+                break;
+            }
+            if bridge_write.write_all(&bytes).await.is_err() {
+                break;
+            }
+            let _ = bridge_write.flush().await;
+        }
+    });
+
+    // Pump outbound bytes written by the local transfer engine into `RELAY_CONTROL` WebSocket frames
+    let state_out = state.clone();
+    let sid_out = session_id.clone();
+    let my_id = state.identity.device_id.clone();
+    let target_id = peer_device_id;
+
+    tauri::async_runtime::spawn(async move {
+        let mut buf = vec![0u8; 24 * 1024];
+        loop {
+            match bridge_read.read(&mut buf).await {
+                Ok(0) | Err(_) => {
+                    if let Some(tx) = state_out.signaling_tx.lock().unwrap().as_ref() {
+                        let eof_msg = json!({
+                            "type": "RELAY_CONTROL",
+                            "session_id": sid_out,
+                            "from_device_id": my_id,
+                            "target_device_id": target_id,
+                            "payload_json": ""
+                        })
+                        .to_string();
+                        let _ = tx.send(eof_msg);
+                    }
+                    break;
+                }
+                Ok(n) => {
+                    let hex_data = hex::encode(&buf[..n]);
+                    let sent_ok = if let Some(tx) = state_out.signaling_tx.lock().unwrap().as_ref()
+                    {
+                        let msg = json!({
+                            "type": "RELAY_CONTROL",
+                            "session_id": sid_out,
+                            "from_device_id": my_id,
+                            "target_device_id": target_id,
+                            "payload_json": hex_data
+                        })
+                        .to_string();
+                        tx.send(msg).is_ok()
+                    } else {
+                        false
+                    };
+                    if !sent_ok {
+                        break;
+                    }
+                }
+            }
+        }
+        state_out.relay_streams.lock().unwrap().remove(&sid_out);
+    });
+
+    tokio::io::split(local_stream)
+}
+
+pub(crate) async fn handle_incoming_stream<R, W>(
     app: AppHandle,
     state: Arc<AppState>,
     mut reader: R,
@@ -387,8 +473,16 @@ where
         } else {
             "wan".to_string()
         },
-        last_known_ip: Some(peer_addr.ip().to_string()),
-        last_known_port: Some(peer_addr.port()),
+        last_known_ip: if peer_addr.port() == 0 {
+            existing_contact.as_ref().and_then(|c| c.last_known_ip.clone())
+        } else {
+            Some(peer_addr.ip().to_string())
+        },
+        last_known_port: if peer_addr.port() == 0 {
+            existing_contact.as_ref().and_then(|c| c.last_known_port)
+        } else {
+            Some(peer_addr.port())
+        },
         trust_level: trust_level.clone(),
         is_online: true,
         last_seen_at: now_unix_secs(),
@@ -426,6 +520,11 @@ where
     // Determine Acceptance (Auto-accept for trusted_auto_accept, otherwise prompt UI Modal)
     let default_dl = state.settings.lock().unwrap().download_dir.clone();
     let decision = if trust_level == "trusted_auto_accept" {
+        if let Some(w) = app.get_webview_window("main") {
+            let _ = w.show();
+            let _ = w.unminimize();
+            let _ = w.set_focus();
+        }
         IncomingRequestDecision {
             accepted: true,
             target_directory: Some(default_dl.clone()),
@@ -447,6 +546,11 @@ where
             total_size_bytes: manifest.total_size_bytes,
             files: manifest.files.clone(),
         };
+        if let Some(w) = app.get_webview_window("main") {
+            let _ = w.show();
+            let _ = w.unminimize();
+            let _ = w.set_focus();
+        }
         let _ = app.emit("incoming_transfer_request", &evt);
 
         match tokio::time::timeout(Duration::from_secs(120), rx).await {
@@ -806,14 +910,54 @@ pub async fn initiate_peer_transfer(
     target_device_id: String,
     file_paths: Vec<String>,
 ) -> Result<String, String> {
-    let contact = state
-        .db
-        .get_contact(&target_device_id)?
-        .ok_or_else(|| format!("Peer {target_device_id} not found in contacts"))?;
+    let contact = match state.db.get_contact(&target_device_id)? {
+        Some(c) => c,
+        None => {
+            let fallback = Contact {
+                device_id: target_device_id.clone(),
+                alias_name: target_device_id.clone(),
+                user_email: None,
+                user_name: None,
+                os_type: None,
+                is_own_device: false,
+                ed25519_pubkey: None,
+                network_type: "wan".to_string(),
+                last_known_ip: None,
+                last_known_port: None,
+                trust_level: "ask".to_string(),
+                is_online: true,
+                last_seen_at: now_unix_secs(),
+                created_at: now_unix_secs(),
+            };
+            let _ = state.db.upsert_contact(&fallback);
+            fallback
+        }
+    };
 
     let (files_with_paths, total_bytes) = collect_outgoing_files(&file_paths)?;
     let session_uuid = Uuid::new_v4();
     let session_id = session_uuid.to_string();
+
+    // Immediately insert & emit the outgoing TransferRecord so the UI displays the progress bar right away
+    let initial_record = TransferRecord {
+        id: session_id.clone(),
+        peer_device_id: contact.device_id.clone(),
+        peer_alias: contact.alias_name.clone(),
+        direction: "outgoing".to_string(),
+        network_route: if contact.network_type == "lan" {
+            "lan_direct".to_string()
+        } else {
+            "wan_p2p".to_string()
+        },
+        total_files: files_with_paths.len(),
+        total_bytes,
+        transferred_bytes: 0,
+        status: "in_progress".to_string(),
+        target_path: None,
+        created_at: now_unix_secs(),
+    };
+    let _ = state.db.upsert_transfer(&initial_record);
+    let _ = app.emit("transfer_state_changed", &initial_record);
 
     let app_c = app.clone();
     let state_c = state.clone();
@@ -832,6 +976,10 @@ pub async fn initiate_peer_transfer(
         .await
         {
             warn!("Outgoing transfer {sid_c} failed: {e}");
+            let mut failed_rec = initial_record;
+            failed_rec.status = "failed".to_string();
+            let _ = state_c.db.upsert_transfer(&failed_rec);
+            let _ = app_c.emit("transfer_state_changed", &failed_rec);
         }
     });
 
@@ -847,11 +995,11 @@ async fn run_outgoing_session(
     files_with_paths: Vec<(u32, PathBuf, ManifestFileEntry)>,
     total_bytes: u64,
 ) -> Result<(), String> {
-    // 1. Try direct LAN TCP connection if LAN IP:Port is known
+    // 1. Try direct LAN TCP connection if LAN IP:Port is already known
     if let (Some(ip), Some(port)) = (&contact.last_known_ip, contact.last_known_port) {
         let target_addr = format!("{ip}:{port}");
         if let Ok(Ok(tcp_stream)) = tokio::time::timeout(
-            Duration::from_millis(1500),
+            Duration::from_millis(1200),
             TcpStream::connect(&target_addr),
         )
         .await
@@ -874,7 +1022,7 @@ async fn run_outgoing_session(
         }
     }
 
-    // 2. Otherwise coordinate WAN NAT Hole-Punching via Signaling Server + QUIC
+    // 2. Coordinate Candidate Exchange & NAT Hole-Punching via Signaling Server
     let signaling_tx = state
         .signaling_tx
         .lock()
@@ -909,41 +1057,79 @@ async fn run_outgoing_session(
     .to_string();
     let _ = signaling_tx.send(intent_msg);
 
-    let answer = match tokio::time::timeout(Duration::from_secs(12), cand_rx).await {
-        Ok(Ok(ans)) => ans,
-        _ => {
-            state
-                .pending_wan_candidates
-                .lock()
-                .unwrap()
-                .remove(&session_id);
-            return Err("Timed out waiting for WAN peer candidate answer".to_string());
+    if let Ok(Ok(answer)) = tokio::time::timeout(Duration::from_millis(3500), cand_rx).await {
+        // 2a. Try Peer's LAN Candidates via Direct TCP first (works when both PCs are on the same Wi-Fi/LAN)
+        for lan_cand in &answer.lan_candidates {
+            if let Ok(Ok(tcp_stream)) = tokio::time::timeout(
+                Duration::from_millis(1000),
+                TcpStream::connect(lan_cand),
+            )
+            .await
+            {
+                let _ = tcp_stream.set_nodelay(true);
+                let (reader, writer) = tokio::io::split(tcp_stream);
+                return stream_outgoing_files(
+                    app,
+                    state,
+                    session_id,
+                    session_uuid,
+                    contact,
+                    files_with_paths,
+                    total_bytes,
+                    reader,
+                    writer,
+                    "lan_direct".to_string(),
+                )
+                .await;
+            }
         }
-    };
 
-    // Wait briefly for UDP hole-punch burst to open NAT pinhole, then connect via QUIC
-    tokio::time::sleep(Duration::from_millis(350)).await;
+        // 2b. Try Direct WAN QUIC over hole-punched UDP using the shared QUIC endpoint
+        if let Some(target_wan_str) = answer.wan_candidate {
+            tokio::time::sleep(Duration::from_millis(250)).await;
+            if let Ok(target_addr) = target_wan_str.parse::<SocketAddr>() {
+                let endpoint_opt = state.quic_endpoint.lock().unwrap().clone();
+                if let Some(endpoint) = endpoint_opt {
+                    if let Ok(connecting) = endpoint.connect(target_addr, "raydrop.local") {
+                        if let Ok(Ok(quic_conn)) =
+                            tokio::time::timeout(Duration::from_millis(2000), connecting).await
+                        {
+                            if let Ok((send_stream, recv_stream)) = quic_conn.open_bi().await {
+                                return stream_outgoing_files(
+                                    app,
+                                    state,
+                                    session_id,
+                                    session_uuid,
+                                    contact,
+                                    files_with_paths,
+                                    total_bytes,
+                                    recv_stream,
+                                    send_stream,
+                                    "wan_p2p".to_string(),
+                                )
+                                .await;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    } else {
+        state
+            .pending_wan_candidates
+            .lock()
+            .unwrap()
+            .remove(&session_id);
+    }
 
-    let target_wan_str = answer
-        .wan_candidate
-        .or_else(|| answer.lan_candidates.into_iter().next())
-        .ok_or_else(|| "Peer returned no usable WAN or LAN candidates".to_string())?;
-
-    let target_addr: SocketAddr = target_wan_str
-        .parse()
-        .map_err(|e: std::net::AddrParseError| e.to_string())?;
-
-    let endpoint = build_quic_endpoints(state.listen_port)?;
-    let quic_conn = endpoint
-        .connect(target_addr, "raydrop.local")
-        .map_err(|e| e.to_string())?
-        .await
-        .map_err(|e| format!("WAN QUIC hole-punch connection failed: {e}"))?;
-
-    let (send_stream, recv_stream) = quic_conn
-        .open_bi()
-        .await
-        .map_err(|e| format!("Failed to open QUIC bidirectional stream: {e}"))?;
+    // 3. Guaranteed Fallback: Stream End-to-End Encrypted (Ed25519 + X25519 + ChaCha20-Poly1305)
+    // frames over the active WSS Signaling tunnel (`RELAY_CONTROL`) when direct sockets are blocked by NAT/Firewall
+    info!(
+        "Direct socket blocked by NAT/Firewall for session {session_id}; using E2EE WSS stream tunnel to {}",
+        contact.device_id
+    );
+    let (relay_reader, relay_writer) =
+        create_ws_relay_stream(state.clone(), session_id.clone(), contact.device_id.clone());
 
     stream_outgoing_files(
         app,
@@ -953,8 +1139,8 @@ async fn run_outgoing_session(
         contact,
         files_with_paths,
         total_bytes,
-        recv_stream,
-        send_stream,
+        relay_reader,
+        relay_writer,
         "wan_p2p".to_string(),
     )
     .await

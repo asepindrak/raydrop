@@ -218,6 +218,72 @@ async fn handle_signaling_message(app: &AppHandle, state: &Arc<AppState>, text: 
                 });
             }
         }
+        "RELAY_CONTROL" => {
+            let session_id = val
+                .get("session_id")
+                .and_then(|v| v.as_str())
+                .unwrap_or_default()
+                .to_string();
+            let from_device_id = val
+                .get("from_device_id")
+                .and_then(|v| v.as_str())
+                .unwrap_or_default()
+                .to_string();
+            let payload_json = val
+                .get("payload_json")
+                .and_then(|v| v.as_str())
+                .unwrap_or_default();
+
+            if session_id.is_empty() || from_device_id.is_empty() {
+                return;
+            }
+
+            let existing_tx = state
+                .relay_streams
+                .lock()
+                .unwrap()
+                .get(&session_id)
+                .cloned();
+
+            let tx = if let Some(tx) = existing_tx {
+                tx
+            } else if !payload_json.is_empty() && state.is_discoverable() {
+                let (reader, writer) = crate::network::transport::create_ws_relay_stream(
+                    state.clone(),
+                    session_id.clone(),
+                    from_device_id,
+                );
+                let app_c = app.clone();
+                let state_c = state.clone();
+                tauri::async_runtime::spawn(async move {
+                    let dummy_addr: std::net::SocketAddr = "0.0.0.0:0".parse().unwrap();
+                    if let Err(e) = crate::network::transport::handle_incoming_stream(
+                        app_c,
+                        state_c,
+                        reader,
+                        writer,
+                        dummy_addr,
+                        "wan_p2p".to_string(),
+                    )
+                    .await
+                    {
+                        warn!("Incoming WSS relay stream error: {e}");
+                    }
+                });
+                match state.relay_streams.lock().unwrap().get(&session_id).cloned() {
+                    Some(t) => t,
+                    None => return,
+                }
+            } else {
+                return;
+            };
+
+            if payload_json.is_empty() {
+                let _ = tx.send(Vec::new());
+            } else if let Ok(bytes) = hex::decode(payload_json) {
+                let _ = tx.send(bytes);
+            }
+        }
         _ => {}
     }
 }

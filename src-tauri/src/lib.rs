@@ -68,6 +68,8 @@ pub fn run() {
         wan_reflexive_addr: Mutex::new(None),
         signaling_connected: AtomicBool::new(false),
         signaling_tx: Mutex::new(None),
+        quic_endpoint: Mutex::new(None),
+        relay_streams: Mutex::new(HashMap::new()),
         pending_requests: Mutex::new(HashMap::new()),
         active_cancellations: Mutex::new(HashMap::new()),
         pending_wan_candidates: Mutex::new(HashMap::new()),

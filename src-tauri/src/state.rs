@@ -38,6 +38,8 @@ pub struct AppState {
     pub wan_reflexive_addr: Mutex<Option<String>>,
     pub signaling_connected: AtomicBool,
     pub signaling_tx: Mutex<Option<mpsc::UnboundedSender<String>>>,
+    pub quic_endpoint: Mutex<Option<quinn::Endpoint>>,
+    pub relay_streams: Mutex<HashMap<String, mpsc::UnboundedSender<Vec<u8>>>>,
     pub pending_requests: Mutex<HashMap<String, oneshot::Sender<IncomingRequestDecision>>>,
     pub active_cancellations: Mutex<HashMap<String, Arc<AtomicBool>>>,
     pub pending_wan_candidates: Mutex<HashMap<String, oneshot::Sender<WanCandidateResponse>>>,
