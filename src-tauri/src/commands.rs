@@ -543,7 +543,7 @@ mod win_shell {
         std::process::Command::new("explorer.exe")
             .raw_arg(format!("/select,\"{}\"", clean_str))
             .spawn()
-            .map_err(|e| format!("Gagal membuka folder: {e}"))?;
+            .map_err(|e| format!("Failed to open folder: {e}"))?;
         Ok(())
     }
 }
@@ -552,7 +552,7 @@ mod win_shell {
 pub fn open_file_path(app: AppHandle, path: String) -> Result<(), String> {
     let p = std::path::PathBuf::from(&path);
     if !p.exists() {
-        return Err(format!("File atau folder tidak ditemukan: {path}"));
+        return Err(format!("File or folder not found: {path}"));
     }
 
     if let Some(w) = app.get_webview_window("main") {
@@ -573,7 +573,7 @@ pub fn open_file_path(app: AppHandle, path: String) -> Result<(), String> {
             .args(["/C", "start", "", &win_path])
             .creation_flags(CREATE_NO_WINDOW)
             .spawn()
-            .map_err(|e| format!("Gagal membuka file: {e}"))?;
+            .map_err(|e| format!("Failed to open file: {e}"))?;
     }
 
     #[cfg(target_os = "macos")]
@@ -581,7 +581,7 @@ pub fn open_file_path(app: AppHandle, path: String) -> Result<(), String> {
         std::process::Command::new("open")
             .arg(&p)
             .spawn()
-            .map_err(|e| format!("Gagal membuka file: {e}"))?;
+            .map_err(|e| format!("Failed to open file: {e}"))?;
     }
 
     #[cfg(target_os = "linux")]
@@ -589,7 +589,7 @@ pub fn open_file_path(app: AppHandle, path: String) -> Result<(), String> {
         std::process::Command::new("xdg-open")
             .arg(&p)
             .spawn()
-            .map_err(|e| format!("Gagal membuka file: {e}"))?;
+            .map_err(|e| format!("Failed to open file: {e}"))?;
     }
 
     Ok(())
@@ -642,16 +642,16 @@ pub fn open_folder_path(app: AppHandle, path: String) -> Result<(), String> {
             } else if let Some(parent) = item.parent() {
                 parent.to_path_buf()
             } else {
-                return Err(format!("Folder tidak ditemukan: {path}"));
+                return Err(format!("Folder not found: {path}"));
             }
         } else if let Some(parent) = p.parent() {
             if parent.exists() {
                 parent.to_path_buf()
             } else {
-                return Err(format!("Folder tidak ditemukan: {path}"));
+                return Err(format!("Folder not found: {path}"));
             }
         } else {
-            return Err(format!("Folder tidak ditemukan: {path}"));
+            return Err(format!("Folder not found: {path}"));
         };
 
         let canonical = std::fs::canonicalize(&dir_to_open).unwrap_or(dir_to_open);
@@ -662,7 +662,7 @@ pub fn open_folder_path(app: AppHandle, path: String) -> Result<(), String> {
         std::process::Command::new("explorer.exe")
             .arg(&win_dir)
             .spawn()
-            .map_err(|e| format!("Gagal membuka folder: {e}"))?;
+            .map_err(|e| format!("Failed to open folder: {e}"))?;
     }
 
     #[cfg(target_os = "macos")]
@@ -673,7 +673,7 @@ pub fn open_folder_path(app: AppHandle, path: String) -> Result<(), String> {
                     .arg("-R")
                     .arg(item)
                     .spawn()
-                    .map_err(|e| format!("Gagal membuka folder: {e}"))?;
+                    .map_err(|e| format!("Failed to open folder: {e}"))?;
                 return Ok(());
             }
         }
@@ -682,12 +682,12 @@ pub fn open_folder_path(app: AppHandle, path: String) -> Result<(), String> {
         } else if let Some(parent) = p.parent() {
             parent.to_path_buf()
         } else {
-            return Err(format!("Folder tidak ditemukan: {path}"));
+            return Err(format!("Folder not found: {path}"));
         };
         std::process::Command::new("open")
             .arg(&dir_to_open)
             .spawn()
-            .map_err(|e| format!("Gagal membuka folder: {e}"))?;
+            .map_err(|e| format!("Failed to open folder: {e}"))?;
     }
 
     #[cfg(target_os = "linux")]
@@ -697,12 +697,12 @@ pub fn open_folder_path(app: AppHandle, path: String) -> Result<(), String> {
         } else if let Some(parent) = p.parent() {
             parent.to_path_buf()
         } else {
-            return Err(format!("Folder tidak ditemukan: {path}"));
+            return Err(format!("Folder not found: {path}"));
         };
         std::process::Command::new("xdg-open")
             .arg(&dir_to_open)
             .spawn()
-            .map_err(|e| format!("Gagal membuka folder: {e}"))?;
+            .map_err(|e| format!("Failed to open folder: {e}"))?;
     }
 
     Ok(())

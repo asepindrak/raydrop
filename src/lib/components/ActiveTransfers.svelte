@@ -115,7 +115,7 @@
     try {
       await raydropApi.openFilePath(path);
     } catch (e: any) {
-      actionError = e?.toString() || 'Gagal membuka file';
+      actionError = e?.toString() || 'Failed to open file';
     }
   }
 
@@ -124,7 +124,7 @@
     try {
       await raydropApi.openFolderPath(path);
     } catch (e: any) {
-      actionError = e?.toString() || 'Gagal membuka folder';
+      actionError = e?.toString() || 'Failed to open folder';
     }
   }
 
@@ -163,7 +163,7 @@
     </div>
   </div>
 
-  <!-- Filter Tabs: Semua / Diterima / Dikirim -->
+  <!-- Filter Tabs: All / Received / Sent -->
   <div class="px-4 py-2.5 border-b border-slate-800/80 flex items-center justify-between gap-2 bg-slate-950/60">
     <div class="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800">
       <button
@@ -172,7 +172,7 @@
           ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
           : 'text-slate-400 hover:text-slate-200'}"
       >
-        <span>Semua</span>
+        <span>All</span>
         <span class="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-800 text-slate-300 font-mono">
           {$activeTransfers.length + $historicalTransfers.length}
         </span>
@@ -185,7 +185,7 @@
           : 'text-slate-400 hover:text-slate-200'}"
       >
         <ArrowDownLeft class="w-3.5 h-3.5 text-emerald-400" />
-        <span>Diterima</span>
+        <span>Received</span>
         <span class="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-800 text-emerald-400 font-mono">
           {incomingCount}
         </span>
@@ -198,7 +198,7 @@
           : 'text-slate-400 hover:text-slate-200'}"
       >
         <ArrowUpRight class="w-3.5 h-3.5 text-cyan-400" />
-        <span>Dikirim</span>
+        <span>Sent</span>
         <span class="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-800 text-cyan-300 font-mono">
           {outgoingCount}
         </span>
@@ -209,10 +209,10 @@
       <button
         on:click={() => handleOpenFolder($appSettings.download_dir)}
         class="flex items-center gap-1.5 text-[11px] text-slate-300 hover:text-white bg-slate-800/90 hover:bg-slate-700/90 px-2.5 py-1 rounded-lg border border-slate-700 transition shrink-0"
-        title="Buka Folder Download ({$appSettings.download_dir})"
+        title="Open Downloads Folder ({$appSettings.download_dir})"
       >
         <FolderOpen class="w-3.5 h-3.5 text-amber-400" />
-        <span>Folder Download</span>
+        <span>Downloads Folder</span>
       </button>
     {/if}
   </div>
@@ -229,7 +229,7 @@
     {#if filteredActive.length > 0}
       <div class="space-y-2.5">
         <p class="text-[11px] font-semibold uppercase tracking-wider text-cyan-400">
-          Proses Transfer Berjalan ({filteredActive.length})
+          Active Transfers ({filteredActive.length})
         </p>
         {#each filteredActive as t (t.id)}
           {@const pct = calcPercent(t.transferred_bytes, t.total_bytes)}
@@ -241,12 +241,12 @@
                 {#if t.direction === 'outgoing'}
                   <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 flex items-center gap-1">
                     <ArrowUpRight class="w-3 h-3 text-cyan-400 shrink-0" />
-                    Dikirim ke
+                    Sent to
                   </span>
                 {:else}
                   <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
                     <ArrowDownLeft class="w-3 h-3 text-emerald-400 shrink-0" />
-                    Diterima dari
+                    Received from
                   </span>
                 {/if}
                 <span class="text-xs font-semibold text-white truncate">{t.peer_alias}</span>
@@ -271,7 +271,7 @@
                   <button
                     on:click={() => handlePause(t.id)}
                     class="text-xs text-amber-300 hover:text-amber-200 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 px-2 py-1 rounded-lg flex items-center gap-1 transition"
-                    title="Pause transfer (bisa dilanjutkan kapan saja)"
+                    title="Pause transfer (can be resumed anytime)"
                   >
                     <Pause class="w-3 h-3" />
                     <span>Pause</span>
@@ -282,14 +282,14 @@
                       on:click={() => handleResume(t.id)}
                       disabled={resumingId === t.id}
                       class="text-xs text-emerald-300 hover:text-emerald-200 bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 px-2.5 py-1 rounded-lg flex items-center gap-1 transition disabled:opacity-50"
-                      title="Lanjutkan transfer tepat dari byte terakhir .raypart"
+                      title="Resume transfer right from the last .raypart byte"
                     >
                       <Play class="w-3 h-3" />
                       <span>{resumingId === t.id ? 'Reconnecting...' : 'Resume'}</span>
                     </button>
                   {:else}
                     <span class="text-[10px] text-amber-300/90 font-mono">
-                      Otomatis lanjut saat pengirim tersambung
+                      Auto-resumes when sender connects
                     </span>
                   {/if}
                 {/if}
@@ -297,7 +297,7 @@
                 <button
                   on:click={() => raydropApi.cancelTransfer(t.id)}
                   class="text-xs text-rose-400 hover:text-rose-300 flex items-center gap-1 px-1.5 py-1"
-                  title="Batalkan transfer"
+                  title="Cancel transfer"
                 >
                   <XCircle class="w-3.5 h-3.5" />
                 </button>
@@ -315,7 +315,7 @@
             <div class="flex items-center justify-between text-[11px] font-mono text-slate-400">
               <span>{formatBytes(t.transferred_bytes)} / {formatBytes(t.total_bytes)} ({pct}%)</span>
               {#if t.status === 'paused'}
-                <span class="text-amber-300">Saved checkpoint (.raypart) • Siap dilanjutkan</span>
+                <span class="text-amber-300">Saved checkpoint (.raypart) • Ready to resume</span>
               {:else}
                 <span>
                   {(t.speed_mbps ?? 0).toFixed(1)} MB/s • ETA {t.eta_seconds ?? 0}s
@@ -327,15 +327,15 @@
             <div class="flex items-center justify-between text-[10px] font-mono text-slate-500 pt-1 border-t border-slate-800/60">
               <div class="flex items-center gap-1 text-slate-400">
                 <Clock class="w-3 h-3 text-slate-500 shrink-0" />
-                <span>Waktu mulai: {formatTransferTime(t.created_at)}</span>
+                <span>Started at: {formatTransferTime(t.created_at)}</span>
               </div>
-              <span class="text-cyan-400 font-semibold">{t.total_files} file</span>
+              <span class="text-cyan-400 font-semibold">{t.total_files} file(s)</span>
             </div>
 
             {#if activeFiles.length > 0}
               <div class="pt-2 border-t border-slate-800/80 space-y-1.5">
                 <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-                  {t.direction === 'incoming' ? 'File yang Sedang Diterima' : 'File yang Sedang Dikirim'} ({activeFiles.length})
+                  {t.direction === 'incoming' ? 'Receiving Files' : 'Sending Files'} ({activeFiles.length})
                 </p>
                 <div class="space-y-1 max-h-32 overflow-y-auto pr-1">
                   {#each activeFiles as fp}
@@ -347,7 +347,7 @@
                       <button
                         on:click={() => handleOpenFolder(fp)}
                         class="text-[10px] font-medium text-amber-300 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 px-2 py-0.5 rounded flex items-center gap-1 shrink-0 transition"
-                        title="Buka folder & fokus ke file ini ({fp})"
+                        title="Open folder & highlight this file ({fp})"
                       >
                         <FolderOpen class="w-3 h-3 text-amber-400" />
                         <span>Open Folder</span>
@@ -365,7 +365,7 @@
     <!-- Transfer History -->
     <div class="space-y-2.5">
       <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-        Riwayat Transfer ({filteredHistory.length})
+        Transfer History ({filteredHistory.length})
       </p>
       {#each filteredHistory as h (h.id)}
         {@const filePaths = parseFilePaths(h.source_paths)}
@@ -385,20 +385,20 @@
                   {#if h.direction === 'outgoing'}
                     <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 flex items-center gap-1">
                       <ArrowUpRight class="w-3 h-3 text-cyan-400 shrink-0" />
-                      Dikirim ke
+                      Sent to
                     </span>
                   {:else}
                     <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
                       <ArrowDownLeft class="w-3 h-3 text-emerald-400 shrink-0" />
-                      Diterima dari
+                      Received from
                     </span>
                   {/if}
                   <span class="text-xs font-semibold text-slate-100 truncate">{h.peer_alias}</span>
                 </div>
                 <div class="flex items-center gap-2 mt-1 flex-wrap text-[11px] font-mono text-slate-400">
-                  <span>{h.total_files} file • {formatBytes(h.transferred_bytes)} / {formatBytes(h.total_bytes)}</span>
+                  <span>{h.total_files} file(s) • {formatBytes(h.transferred_bytes)} / {formatBytes(h.total_bytes)}</span>
                   <span class="text-slate-600">•</span>
-                  <div class="flex items-center gap-1 text-slate-400" title="Waktu transfer">
+                  <div class="flex items-center gap-1 text-slate-400" title="Transfer time">
                     <Clock class="w-3 h-3 text-slate-500 shrink-0" />
                     <span>{formatTransferTime(h.created_at)}</span>
                   </div>
@@ -411,7 +411,7 @@
                   on:click={() => handleResume(h.id)}
                   disabled={resumingId === h.id}
                   class="text-[11px] text-cyan-300 hover:text-cyan-200 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 px-2 py-0.5 rounded-lg flex items-center gap-1 transition"
-                  title="Lanjutkan / coba ulang transfer dari checkpoint"
+                  title="Resume / retry transfer from checkpoint"
                 >
                   <RotateCcw class="w-3 h-3" />
                   <span>Resume</span>
@@ -433,7 +433,7 @@
             <div class="pt-2 border-t border-slate-800/80 space-y-1.5">
               <div class="flex items-center justify-between">
                 <span class="text-[10px] font-semibold uppercase tracking-wider text-cyan-400">
-                  {h.direction === 'incoming' ? 'Detail File yang Diterima' : 'Detail File yang Dikirim'} ({filePaths.length} file)
+                  {h.direction === 'incoming' ? 'Received Files' : 'Sent Files'} ({filePaths.length} file(s))
                 </span>
                 {#if filePaths.length > 3}
                   <button
@@ -441,10 +441,10 @@
                     class="text-[10px] text-slate-400 hover:text-white flex items-center gap-0.5"
                   >
                     {#if isExpanded}
-                      <span>Ringkas</span>
+                      <span>Collapse</span>
                       <ChevronUp class="w-3 h-3" />
                     {:else}
-                      <span>Lihat Semua ({filePaths.length})</span>
+                      <span>View All ({filePaths.length})</span>
                       <ChevronDown class="w-3 h-3" />
                     {/if}
                   </button>
@@ -471,7 +471,7 @@
                       <button
                         on:click={() => handleOpenFile(fp)}
                         class="text-[11px] font-medium text-cyan-300 hover:text-white bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/30 px-2 py-1 rounded-md flex items-center gap-1 transition"
-                        title="Buka file ini langsung ({getBaseName(fp)})"
+                        title="Open this file directly ({getBaseName(fp)})"
                       >
                         <ExternalLink class="w-3 h-3" />
                         <span>Open File</span>
@@ -479,7 +479,7 @@
                       <button
                         on:click={() => handleOpenFolder(fp)}
                         class="text-[11px] font-medium text-slate-200 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 px-2 py-1 rounded-md flex items-center gap-1 transition"
-                        title="Buka folder & langsung fokus/sorot file ini ({fp})"
+                        title="Open folder & highlight this file ({fp})"
                       >
                         <FolderOpen class="w-3 h-3 text-amber-400" />
                         <span>Open Folder</span>
@@ -492,12 +492,12 @@
           {:else if h.status === 'completed' && fallbackFolder}
             <div class="flex items-center justify-between pt-2 border-t border-slate-800/70">
               <span class="text-[11px] font-mono text-slate-400 truncate" title={fallbackFolder}>
-                Lokasi: {fallbackFolder}
+                Location: {fallbackFolder}
               </span>
               <button
                 on:click={() => handleOpenFolder(fallbackFolder)}
                 class="text-[11px] font-medium text-slate-200 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 px-2.5 py-1 rounded-lg flex items-center gap-1.5 shrink-0 transition"
-                title="Buka folder lokasi download ({fallbackFolder})"
+                title="Open download folder ({fallbackFolder})"
               >
                 <FolderOpen class="w-3 h-3 text-amber-400" />
                 <span>Open Folder</span>
@@ -509,13 +509,13 @@
         <div class="h-44 flex flex-col items-center justify-center text-center px-4">
           <p class="text-xs text-slate-400">
             {transferFilter === 'incoming'
-              ? 'Belum ada file yang diterima.'
+              ? 'No received files yet.'
               : transferFilter === 'outgoing'
-                ? 'Belum ada file yang dikirim.'
-                : 'Belum ada proses atau riwayat transfer.'}
+                ? 'No sent files yet.'
+                : 'No active or historical transfers.'}
           </p>
           <p class="text-[11px] text-slate-500 mt-1">
-            Klik kanan file di File Explorer lalu pilih "Send with Raydrop" untuk mengirim file.
+            Right-click any file in File Explorer and choose "Send with Raydrop" to transfer files.
           </p>
         </div>
       {/each}

@@ -183,14 +183,14 @@
           <div>
             <h3 class="text-base font-bold text-white">Send Selected File(s)</h3>
             <p class="text-xs text-slate-400">
-              {$cliQueuedFiles.length} item dipilih dari Windows Explorer
+              {$cliQueuedFiles.length} item(s) selected from File Explorer
             </p>
           </div>
         </div>
         <button
           on:click={() => cliQueuedFiles.set([])}
           class="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
-          title="Tutup"
+          title="Close"
         >
           <X class="w-4 h-4" />
         </button>
@@ -210,7 +210,7 @@
       <!-- Quick 1-Click Contacts Selector -->
       <div>
         <label for="cli-recipient-peer" class="block text-xs font-semibold text-slate-200 mb-1.5">
-          Pilih Perangkat / Kontak Tujuan (Langsung Klik atau Pilih Dropdown)
+          Select Recipient Device / Contact (Click directly or select from dropdown)
         </label>
 
         {#if $contacts.length > 0}
@@ -257,7 +257,7 @@
           autofocus
           class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-cyan-500 ring-1 focus:ring-cyan-500/30"
         >
-          <option value="">-- Atau Pilih dari Daftar Kontak / Perangkat --</option>
+          <option value="">-- Or Select from Contact / Device List --</option>
           {#each $contacts as peer}
             <option value={peer.device_id}>
               {peer.is_own_device ? '💻 [My Device] ' : ''}{peer.alias_name} {peer.user_email ? `(${peer.user_email})` : `(${peer.network_type.toUpperCase()})`} {peer.is_online ? '• Online' : ''}
@@ -267,20 +267,20 @@
       </div>
 
       <div class="flex items-center justify-between pt-2 border-t border-slate-800/80">
-        <span class="text-[11px] text-slate-400 font-mono">Tekan Enter untuk langsung kirim</span>
+        <span class="text-[11px] text-slate-400 font-mono">Press Enter to send immediately</span>
         <div class="flex items-center gap-2">
           <button
             on:click={() => cliQueuedFiles.set([])}
             class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300 transition"
           >
-            Batal
+            Cancel
           </button>
           <button
             on:click={() => confirmCliSend()}
             disabled={!selectedPeerForCli}
             class="px-5 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 disabled:opacity-40 text-xs font-bold text-slate-950 transition shadow-lg shadow-cyan-500/20"
           >
-            Kirim File Sekarang (Enter)
+            Send Files Now (Enter)
           </button>
         </div>
       </div>
