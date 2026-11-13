@@ -507,6 +507,14 @@ mod win_shell {
             apidl: *const *const std::ffi::c_void,
             dw_flags: u32,
         ) -> i32;
+        fn ShellExecuteW(
+            hwnd: *mut std::ffi::c_void,
+            lpOperation: *const u16,
+            lpFile: *const u16,
+            lpParameters: *const u16,
+            lpDirectory: *const u16,
+            nShowCmd: i32,
+        ) -> usize;
     }
 
     #[link(name = "ole32")]
@@ -523,6 +531,45 @@ mod win_shell {
         unsafe {
             let _ = AllowSetForegroundWindow(0xFFFF_FFFF);
         }
+    }
+
+    pub fn open_file_with_default_app(path: &Path) -> Result<(), String> {
+        let clean_str = path
+            .to_string_lossy()
+            .trim_start_matches(r"\\?\")
+            .replace('/', r"\");
+        let wide: Vec<u16> = OsStr::new(&clean_str)
+            .encode_wide()
+            .chain(std::iter::once(0))
+            .collect();
+        let open_op: Vec<u16> = OsStr::new("open")
+            .encode_wide()
+            .chain(std::iter::once(0))
+            .collect();
+
+        unsafe {
+            let _ = AllowSetForegroundWindow(0xFFFF_FFFF);
+            let res = ShellExecuteW(
+                ptr::null_mut(),
+                open_op.as_ptr(),
+                wide.as_ptr(),
+                ptr::null(),
+                ptr::null(),
+                1, // SW_SHOWNORMAL
+            );
+            if res > 32 {
+                return Ok(());
+            }
+        }
+
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        std::process::Command::new("cmd")
+            .args(["/C", "start", "", &clean_str])
+            .creation_flags(CREATE_NO_WINDOW)
+            .spawn()
+            .map_err(|e| format!("Failed to open file: {e}"))?;
+        Ok(())
     }
 
     pub fn reveal_and_select_file(path: &Path) -> Result<(), String> {
@@ -571,19 +618,7 @@ pub fn open_file_path(app: AppHandle, path: String) -> Result<(), String> {
 
     #[cfg(target_os = "windows")]
     {
-        use std::os::windows::process::CommandExt;
-        const CREATE_NO_WINDOW: u32 = 0x08000000;
-        win_shell::allow_foreground();
-        let canonical = std::fs::canonicalize(&p).unwrap_or_else(|_| p.clone());
-        let win_path = canonical
-            .to_string_lossy()
-            .trim_start_matches(r"\\?\")
-            .replace('/', "\\");
-        std::process::Command::new("cmd")
-            .args(["/C", "start", "", &win_path])
-            .creation_flags(CREATE_NO_WINDOW)
-            .spawn()
-            .map_err(|e| format!("Failed to open file: {e}"))?;
+        win_shell::open_file_with_default_app(&p)?;
     }
 
     #[cfg(target_os = "macos")]

@@ -85,8 +85,13 @@
       if (Array.isArray(parsed)) {
         return parsed.filter((x) => typeof x === 'string' && x.trim().length > 0);
       }
+      if (typeof parsed === 'string' && parsed.trim().length > 0) {
+        return [parsed.trim()];
+      }
     } catch {
-      // ignore
+      if (typeof sourcePathsJson === 'string' && sourcePathsJson.trim().length > 0) {
+        return [sourcePathsJson.trim()];
+      }
     }
     return [];
   }
@@ -619,81 +624,125 @@
         <div class="space-y-2">
           {#each filteredHistory as h (h.id)}
             {@const files = parseFilePaths(h.source_paths)}
+            {@const primaryFilePath = files[0] || h.target_path}
             {@const primaryName = files[0] ? getBaseName(files[0]) : (h.target_path ? getBaseName(h.target_path) : 'File Package')}
             {@const badge = getFileTypeBadge(primaryName)}
 
-            <div class="p-3.5 rounded-xl bg-slate-900/70 hover:bg-slate-900 border border-slate-800/90 hover:border-slate-700 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-colors">
-              <div class="flex items-center gap-3 min-w-0">
-                <div class="w-9 h-9 rounded-xl {badge.color} border flex items-center justify-center font-mono font-bold text-[10px] shrink-0">
-                  {badge.label}
+            <div class="p-3.5 rounded-xl bg-slate-900/70 hover:bg-slate-900 border border-slate-800/90 hover:border-slate-700 flex flex-col gap-2.5 transition-colors">
+              <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div class="flex items-center gap-3 min-w-0">
+                  <div class="w-9 h-9 rounded-xl {badge.color} border flex items-center justify-center font-mono font-bold text-[10px] shrink-0">
+                    {badge.label}
+                  </div>
+
+                  <div class="min-w-0">
+                    <div class="flex items-center gap-2">
+                      <span class="text-xs font-bold text-white truncate max-w-sm" title={primaryName}>
+                        {primaryName}
+                      </span>
+                      {#if files.length > 1}
+                        <button
+                          type="button"
+                          on:click={() => toggleExpanded(h.id)}
+                          class="text-[10px] text-cyan-400 hover:text-cyan-300 font-medium flex items-center gap-0.5"
+                        >
+                          <span>({files.length} files)</span>
+                          {#if expandedTransferIds[h.id]}
+                            <ChevronUp class="w-3 h-3" />
+                          {:else}
+                            <ChevronDown class="w-3 h-3" />
+                          {/if}
+                        </button>
+                      {/if}
+                      <span class="text-[10px] font-mono text-slate-400">({formatBytes(h.total_bytes)})</span>
+                    </div>
+
+                    <div class="flex items-center gap-2 mt-0.5 text-[11px] text-slate-400">
+                      {#if h.direction === 'outgoing'}
+                        <span class="text-cyan-300 font-medium flex items-center gap-1">
+                          <ArrowUpRight class="w-3 h-3 text-cyan-400" />
+                          Sent to {h.peer_alias}
+                        </span>
+                      {:else}
+                        <span class="text-emerald-300 font-medium flex items-center gap-1">
+                          <ArrowDownLeft class="w-3 h-3 text-emerald-400" />
+                          Received from {h.peer_alias}
+                        </span>
+                      {/if}
+                      <span>•</span>
+                      <span class="text-slate-500">{formatTransferTime(h.created_at)}</span>
+                    </div>
+                  </div>
                 </div>
 
-                <div class="min-w-0">
-                  <div class="flex items-center gap-2">
-                    <span class="text-xs font-bold text-white truncate max-w-sm" title={primaryName}>
-                      {primaryName}
+                <!-- Quick Action Buttons -->
+                <div class="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                  {#if h.status === 'completed'}
+                    <span class="flex items-center gap-1 text-[11px] text-emerald-400 font-semibold bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                      <CheckCircle2 class="w-3.5 h-3.5" />
+                      Verified
                     </span>
-                    {#if files.length > 1}
-                      <span class="text-[10px] text-slate-400">({files.length} files)</span>
-                    {/if}
-                    <span class="text-[10px] font-mono text-slate-400">({formatBytes(h.total_bytes)})</span>
-                  </div>
 
-                  <div class="flex items-center gap-2 mt-0.5 text-[11px] text-slate-400">
-                    {#if h.direction === 'outgoing'}
-                      <span class="text-cyan-300 font-medium flex items-center gap-1">
-                        <ArrowUpRight class="w-3 h-3 text-cyan-400" />
-                        Sent to {h.peer_alias}
-                      </span>
-                    {:else}
-                      <span class="text-emerald-300 font-medium flex items-center gap-1">
-                        <ArrowDownLeft class="w-3 h-3 text-emerald-400" />
-                        Received from {h.peer_alias}
-                      </span>
+                    {#if primaryFilePath}
+                      <button
+                        type="button"
+                        on:click={() => handleOpenFile(primaryFilePath)}
+                        class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs text-slate-200 hover:text-white border border-slate-700 transition"
+                        title="Open File Directly"
+                      >
+                        Open
+                      </button>
+                      <button
+                        type="button"
+                        on:click={() => handleOpenFolder(primaryFilePath)}
+                        class="p-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-amber-300 border border-slate-700 transition"
+                        title="Open Containing Folder"
+                      >
+                        <FolderOpen class="w-3.5 h-3.5" />
+                      </button>
                     {/if}
-                    <span>•</span>
-                    <span class="text-slate-500">{formatTransferTime(h.created_at)}</span>
-                  </div>
+                  {:else if h.status === 'failed'}
+                    <span class="flex items-center gap-1 text-[11px] text-rose-400 font-semibold bg-rose-500/10 px-2 py-0.5 rounded-full border border-rose-500/20">
+                      <XCircle class="w-3.5 h-3.5" />
+                      Failed
+                    </span>
+                  {:else if h.status === 'cancelled'}
+                    <span class="flex items-center gap-1 text-[11px] text-slate-400 font-semibold bg-slate-800 px-2 py-0.5 rounded-full border border-slate-700">
+                      Cancelled
+                    </span>
+                  {/if}
                 </div>
               </div>
 
-              <!-- Quick Action Buttons -->
-              <div class="flex items-center gap-2 shrink-0 self-end sm:self-center">
-                {#if h.status === 'completed'}
-                  <span class="flex items-center gap-1 text-[11px] text-emerald-400 font-semibold bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
-                    <CheckCircle2 class="w-3.5 h-3.5" />
-                    Verified
-                  </span>
-
-                  {#if h.target_path}
-                    <button
-                      type="button"
-                      on:click={() => handleOpenFile(h.target_path)}
-                      class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs text-slate-200 hover:text-white border border-slate-700 transition"
-                      title="Open File"
-                    >
-                      Open
-                    </button>
-                    <button
-                      type="button"
-                      on:click={() => handleOpenFolder(h.target_path)}
-                      class="p-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-amber-300 border border-slate-700 transition"
-                      title="Open Containing Folder"
-                    >
-                      <FolderOpen class="w-3.5 h-3.5" />
-                    </button>
-                  {/if}
-                {:else if h.status === 'failed'}
-                  <span class="flex items-center gap-1 text-[11px] text-rose-400 font-semibold bg-rose-500/10 px-2 py-0.5 rounded-full border border-rose-500/20">
-                    <XCircle class="w-3.5 h-3.5" />
-                    Failed
-                  </span>
-                {:else if h.status === 'cancelled'}
-                  <span class="flex items-center gap-1 text-[11px] text-slate-400 font-semibold bg-slate-800 px-2 py-0.5 rounded-full border border-slate-700">
-                    Cancelled
-                  </span>
-                {/if}
-              </div>
+              <!-- Expanded Multiple Files List for History -->
+              {#if expandedTransferIds[h.id] && files.length > 1}
+                <div class="pt-2 border-t border-slate-800/80 space-y-1.5 max-h-40 overflow-y-auto pr-1">
+                  {#each files as fp}
+                    <div class="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg bg-slate-950/80 border border-slate-800">
+                      <div class="flex items-center gap-2 min-w-0">
+                        <FileText class="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                        <span class="text-xs text-slate-200 truncate" title={fp}>{getBaseName(fp)}</span>
+                      </div>
+                      <div class="flex items-center gap-2 shrink-0">
+                        <button
+                          type="button"
+                          on:click={() => handleOpenFile(fp)}
+                          class="text-[11px] text-cyan-400 hover:text-cyan-300 hover:underline"
+                        >
+                          Open
+                        </button>
+                        <button
+                          type="button"
+                          on:click={() => handleOpenFolder(fp)}
+                          class="text-[11px] text-slate-400 hover:text-slate-200 hover:underline"
+                        >
+                          Locate
+                        </button>
+                      </div>
+                    </div>
+                  {/each}
+                </div>
+              {/if}
             </div>
           {/each}
         </div>
