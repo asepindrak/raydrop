@@ -1,7 +1,7 @@
 use axum::{
     extract::{
         ws::{Message, WebSocket, WebSocketUpgrade},
-        ConnectInfo, Path, State,
+        ConnectInfo, DefaultBodyLimit, Path, State,
     },
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Json},
@@ -18,16 +18,32 @@ use serde_json::json;
 use std::{
     net::SocketAddr,
     sync::{Arc, Mutex},
-    time::{SystemTime, UNIX_EPOCH},
+    time::{Instant, SystemTime, UNIX_EPOCH},
 };
 use tokio::{net::UdpSocket, sync::mpsc};
 use tower_http::cors::CorsLayer;
 use tracing::{info, warn};
 use uuid::Uuid;
 
+const MAX_HTTP_BODY_BYTES: usize = 64 * 1024; // 64 KB max JSON body
+const MAX_WS_MESSAGE_BYTES: usize = 2 * 1024 * 1024; // 2 MB max WebSocket frame
+const PEER_CHANNEL_CAPACITY: usize = 256; // Bounded per-peer queue to prevent VPS OOM
+const AUTH_RATE_WINDOW_SECS: u64 = 300; // 5-minute window
+const MAX_AUTH_ATTEMPTS_PER_WINDOW: u32 = 10; // Max 10 failed login/register attempts per 5 mins per IP
+const AUTH_LOCKOUT_SECS: u64 = 600; // 10-minute temporary ban on brute-force
+const MAX_WS_MSGS_PER_SEC: u32 = 160; // Per-socket message flood limit
+
+#[derive(Clone)]
+struct RateLimitBucket {
+    failures: u32,
+    window_start: u64,
+    locked_until: u64,
+}
+
 #[derive(Clone)]
 struct ServerState {
     peers: Arc<DashMap<String, PeerSession>>,
+    auth_limiter: Arc<DashMap<String, RateLimitBucket>>,
     db: Arc<Mutex<Connection>>,
 }
 
@@ -37,7 +53,7 @@ struct PeerSession {
     user_email: Option<String>,
     alias_name: String,
     ed25519_pubkey: String,
-    tx: mpsc::UnboundedSender<String>,
+    tx: mpsc::Sender<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -159,13 +175,91 @@ fn now_secs() -> u64 {
         .as_secs()
 }
 
+/// Extracts real client IP behind Traefik / reverse proxy (`X-Forwarded-For` / `X-Real-IP`)
+fn extract_client_ip(headers: &HeaderMap, fallback_addr: SocketAddr) -> String {
+    if let Some(xff) = headers.get("x-forwarded-for").and_then(|v| v.to_str().ok()) {
+        if let Some(first_ip) = xff.split(',').next() {
+            let trimmed = first_ip.trim();
+            if !trimmed.is_empty() && trimmed.len() <= 64 {
+                return trimmed.to_string();
+            }
+        }
+    }
+    if let Some(xri) = headers.get("x-real-ip").and_then(|v| v.to_str().ok()) {
+        let trimmed = xri.trim();
+        if !trimmed.is_empty() && trimmed.len() <= 64 {
+            return trimmed.to_string();
+        }
+    }
+    fallback_addr.ip().to_string()
+}
+
+/// Checks if `client_ip` is currently rate-limited / locked out from auth endpoints.
+fn check_auth_rate_limit(state: &ServerState, client_ip: &str) -> Result<(), u64> {
+    let now = now_secs();
+    if let Some(mut entry) = state.auth_limiter.get_mut(client_ip) {
+        if entry.locked_until > now {
+            return Err(entry.locked_until - now);
+        }
+        if now.saturating_sub(entry.window_start) > AUTH_RATE_WINDOW_SECS {
+            entry.failures = 0;
+            entry.window_start = now;
+            entry.locked_until = 0;
+        }
+    }
+    Ok(())
+}
+
+/// Records a failed auth attempt or rate-limited action for `client_ip`.
+fn record_auth_failure(state: &ServerState, client_ip: &str) {
+    let now = now_secs();
+    let mut entry = state
+        .auth_limiter
+        .entry(client_ip.to_string())
+        .or_insert(RateLimitBucket {
+            failures: 0,
+            window_start: now,
+            locked_until: 0,
+        });
+    if now.saturating_sub(entry.window_start) > AUTH_RATE_WINDOW_SECS {
+        entry.failures = 1;
+        entry.window_start = now;
+        entry.locked_until = 0;
+    } else {
+        entry.failures += 1;
+        if entry.failures >= MAX_AUTH_ATTEMPTS_PER_WINDOW {
+            entry.locked_until = now + AUTH_LOCKOUT_SECS;
+            warn!(
+                "SECURITY: IP {} locked out for {}s due to repeated auth failures",
+                client_ip, AUTH_LOCKOUT_SECS
+            );
+        }
+    }
+}
+
+fn clear_auth_failures(state: &ServerState, client_ip: &str) {
+    state.auth_limiter.remove(client_ip);
+}
+
+/// Constant-time string comparison to prevent timing side-channel attacks on password hashes and tokens.
+fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
+    if a.len() != b.len() {
+        return false;
+    }
+    let mut diff = 0u8;
+    for (x, y) in a.iter().zip(b.iter()) {
+        diff |= x ^ y;
+    }
+    diff == 0
+}
+
 fn hash_password(password: &str, salt_hex: &str) -> String {
     let mut hasher = blake3::Hasher::new();
     hasher.update(b"RAYDROP_AUTH_V2:");
     hasher.update(salt_hex.as_bytes());
     hasher.update(b":");
     hasher.update(password.as_bytes());
-    // Perform 10,000 rounds of iterated BLAKE3 key stretching
+    // Perform 10,000 rounds of iterated BLAKE3 key stretching (compatible with existing DB hashes)
     let mut current = hasher.finalize();
     for _ in 0..10_000 {
         let mut h = blake3::Hasher::new();
@@ -180,6 +274,28 @@ fn generate_random_hex(bytes_len: usize) -> String {
     let mut buf = vec![0u8; bytes_len];
     rand::thread_rng().fill_bytes(&mut buf);
     hex::encode(buf)
+}
+
+/// Verifies that `device_id` (`RAY-XXXX-XXXX-XXXX`) is mathematically derived from `ed25519_pubkey_hex`.
+fn verify_device_id_matches_pubkey(device_id: &str, ed25519_pubkey_hex: &str) -> bool {
+    let Ok(pub_bytes) = hex::decode(ed25519_pubkey_hex) else {
+        return false;
+    };
+    let Ok(pub_arr): Result<[u8; 32], _> = pub_bytes.try_into() else {
+        return false;
+    };
+    if VerifyingKey::from_bytes(&pub_arr).is_err() {
+        return false;
+    }
+    let hash = blake3::hash(&pub_arr);
+    let hex_hash = hash.to_hex().to_uppercase();
+    let expected_id = format!(
+        "RAY-{}-{}-{}",
+        &hex_hash[0..4],
+        &hex_hash[4..8],
+        &hex_hash[8..12]
+    );
+    device_id == expected_id
 }
 
 fn init_database(db_path: &str) -> Connection {
@@ -251,8 +367,21 @@ async fn main() {
     let conn = init_database(&db_path);
     let state = ServerState {
         peers: Arc::new(DashMap::new()),
+        auth_limiter: Arc::new(DashMap::new()),
         db: Arc::new(Mutex::new(conn)),
     };
+
+    // Periodically prune expired rate-limit entries every 10 minutes
+    let limiter_cleanup = state.auth_limiter.clone();
+    tokio::spawn(async move {
+        loop {
+            tokio::time::sleep(std::time::Duration::from_secs(600)).await;
+            let now = now_secs();
+            limiter_cleanup.retain(|_, v| {
+                v.locked_until > now || now.saturating_sub(v.window_start) <= AUTH_RATE_WINDOW_SECS
+            });
+        }
+    });
 
     // Spawn UDP STUN / Reflexive Address Discovery Listener
     let udp_bind = udp_addr.clone();
@@ -260,9 +389,12 @@ async fn main() {
         match UdpSocket::bind(&udp_bind).await {
             Ok(sock) => {
                 info!("Raydrop UDP STUN reflector listening on {udp_bind}");
-                let mut buf = [0u8; 1024];
+                let mut buf = [0u8; 512];
                 loop {
                     if let Ok((len, peer_addr)) = sock.recv_from(&mut buf).await {
+                        if len > 256 {
+                            continue; // Drop oversized UDP packets to prevent amplification
+                        }
                         let req = &buf[..len];
                         if req.starts_with(b"RAYD_STUN") {
                             let resp = json!({
@@ -299,6 +431,7 @@ async fn main() {
             post(add_contact_handler).patch(update_contact_trust_handler),
         )
         .route("/api/contacts/:email", delete(delete_contact_handler))
+        .layer(DefaultBodyLimit::max(MAX_HTTP_BODY_BYTES))
         .layer(CorsLayer::permissive())
         .with_state(state);
 
@@ -315,20 +448,11 @@ async fn main() {
     .unwrap();
 }
 
-async fn health_handler(State(state): State<ServerState>) -> impl IntoResponse {
-    let total_users: i64 = state
-        .db
-        .lock()
-        .ok()
-        .and_then(|c| c.query_row("SELECT COUNT(*) FROM users", [], |r| r.get(0)).ok())
-        .unwrap_or(0);
-
+async fn health_handler() -> impl IntoResponse {
     Json(json!({
         "status": "ok",
         "service": "raydrop-signal-server",
-        "version": "2.0.0",
-        "online_peers": state.peers.len(),
-        "registered_users": total_users
+        "version": "2.1.0"
     }))
 }
 
@@ -338,6 +462,7 @@ fn extract_bearer_token(headers: &HeaderMap) -> Option<String> {
         .and_then(|v| v.to_str().ok())
         .and_then(|s| s.strip_prefix("Bearer "))
         .map(|s| s.trim().to_string())
+        .filter(|t| t.len() == 64 && t.chars().all(|c| c.is_ascii_hexdigit()))
 }
 
 fn authenticate_token(conn: &Connection, token: &str) -> Option<UserProfile> {
@@ -451,7 +576,30 @@ fn upsert_device_record(
     ed25519_pubkey: &str,
     last_ip: Option<&str>,
 ) -> Result<(), String> {
+    if !verify_device_id_matches_pubkey(device_id, ed25519_pubkey) {
+        return Err("Device ID does not match Ed25519 public key".to_string());
+    }
+
+    // Prevent key spoofing: if device_id already exists, its Ed25519 public key must match
+    let existing_pubkey: Option<String> = conn
+        .query_row(
+            "SELECT ed25519_pubkey FROM devices WHERE device_id = ?1",
+            params![device_id],
+            |r| r.get(0),
+        )
+        .optional()
+        .map_err(|e| e.to_string())?;
+
+    if let Some(saved_pk) = existing_pubkey {
+        if !constant_time_eq(saved_pk.as_bytes(), ed25519_pubkey.as_bytes()) {
+            return Err("Cryptographic key mismatch for existing device_id".to_string());
+        }
+    }
+
     let now = now_secs() as i64;
+    let safe_name: String = device_name.trim().chars().take(64).collect();
+    let safe_os: String = os_type.trim().chars().take(32).collect();
+
     conn.execute(
         "INSERT INTO devices (device_id, user_id, device_name, os_type, ed25519_pubkey, last_ip, last_seen_at, created_at)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
@@ -459,14 +607,13 @@ fn upsert_device_record(
             user_id = excluded.user_id,
             device_name = excluded.device_name,
             os_type = excluded.os_type,
-            ed25519_pubkey = excluded.ed25519_pubkey,
             last_ip = COALESCE(excluded.last_ip, devices.last_ip),
             last_seen_at = excluded.last_seen_at",
         params![
             device_id,
             user_id,
-            device_name,
-            os_type,
+            safe_name,
+            safe_os,
             ed25519_pubkey,
             last_ip,
             now,
@@ -478,16 +625,41 @@ fn upsert_device_record(
 }
 
 async fn register_handler(
+    headers: HeaderMap,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
     State(state): State<ServerState>,
     Json(req): Json<RegisterRequest>,
 ) -> impl IntoResponse {
+    let client_ip = extract_client_ip(&headers, addr);
+    if let Err(wait_secs) = check_auth_rate_limit(&state, &client_ip) {
+        return (
+            StatusCode::TOO_MANY_REQUESTS,
+            Json(json!({
+                "error": format!("Terlalu banyak percobaan. Silakan tunggu {wait_secs} detik.")
+            })),
+        );
+    }
+
     let email = req.email.trim().to_lowercase();
-    let name = req.name.trim().to_string();
-    if !email.contains('@') || name.is_empty() || req.password.len() < 4 {
+    let name: String = req.name.trim().chars().take(80).collect();
+    if !email.contains('@')
+        || email.len() > 128
+        || name.is_empty()
+        || req.password.len() < 4
+        || req.password.len() > 256
+    {
+        record_auth_failure(&state, &client_ip);
         return (
             StatusCode::BAD_REQUEST,
-            Json(json!({ "error": "Please provide a valid email, name, and password (min 4 chars)." })),
+            Json(json!({ "error": "Please provide a valid email, name, and password (4-256 chars)." })),
+        );
+    }
+
+    if !verify_device_id_matches_pubkey(&req.device_id, &req.ed25519_pubkey) {
+        record_auth_failure(&state, &client_ip);
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": "Invalid cryptographic device identity." })),
         );
     }
 
@@ -502,6 +674,7 @@ async fn register_handler(
         .unwrap_or(None);
 
     if exists.is_some() {
+        record_auth_failure(&state, &client_ip);
         return (
             StatusCode::CONFLICT,
             Json(json!({ "error": "Email is already registered. Please sign in instead." })),
@@ -524,7 +697,6 @@ async fn register_handler(
         );
     }
 
-    let ip_str = addr.ip().to_string();
     let _ = upsert_device_record(
         &conn,
         &req.device_id,
@@ -532,7 +704,7 @@ async fn register_handler(
         &req.device_name,
         &req.os_type,
         &req.ed25519_pubkey,
-        Some(&ip_str),
+        Some(&client_ip),
     );
 
     let token = generate_random_hex(32);
@@ -543,6 +715,7 @@ async fn register_handler(
 
     let my_devices = query_user_devices(&conn, &state.peers, &user_id);
     let contacts = query_user_contacts(&conn, &state.peers, &user_id);
+    clear_auth_failures(&state, &client_ip);
 
     info!("Registered new user: {email} ({name}) on device {}", req.device_id);
 
@@ -562,10 +735,37 @@ async fn register_handler(
 }
 
 async fn login_handler(
+    headers: HeaderMap,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
     State(state): State<ServerState>,
     Json(req): Json<LoginRequest>,
 ) -> impl IntoResponse {
+    let client_ip = extract_client_ip(&headers, addr);
+    if let Err(wait_secs) = check_auth_rate_limit(&state, &client_ip) {
+        return (
+            StatusCode::TOO_MANY_REQUESTS,
+            Json(json!({
+                "error": format!("Terlalu banyak percobaan login gagal. Silakan tunggu {wait_secs} detik.")
+            })),
+        );
+    }
+
+    if req.password.len() > 256 || req.email.len() > 128 {
+        record_auth_failure(&state, &client_ip);
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": "Invalid credentials." })),
+        );
+    }
+
+    if !verify_device_id_matches_pubkey(&req.device_id, &req.ed25519_pubkey) {
+        record_auth_failure(&state, &client_ip);
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": "Invalid cryptographic device identity." })),
+        );
+    }
+
     let email = req.email.trim().to_lowercase();
     let conn = state.db.lock().unwrap();
 
@@ -579,21 +779,24 @@ async fn login_handler(
         .unwrap_or(None);
 
     let Some((user_id, name, salt, expected_hash)) = row else {
+        record_auth_failure(&state, &client_ip);
         return (
             StatusCode::UNAUTHORIZED,
-            Json(json!({ "error": "Account not found for this email." })),
+            Json(json!({ "error": "Email atau password salah." })),
         );
     };
 
     let computed = hash_password(&req.password, &salt);
-    if computed != expected_hash {
+    if !constant_time_eq(computed.as_bytes(), expected_hash.as_bytes()) {
+        record_auth_failure(&state, &client_ip);
         return (
             StatusCode::UNAUTHORIZED,
-            Json(json!({ "error": "Invalid password." })),
+            Json(json!({ "error": "Email atau password salah." })),
         );
     }
 
-    let ip_str = addr.ip().to_string();
+    clear_auth_failures(&state, &client_ip);
+
     let _ = upsert_device_record(
         &conn,
         &req.device_id,
@@ -601,7 +804,7 @@ async fn login_handler(
         &req.device_name,
         &req.os_type,
         &req.ed25519_pubkey,
-        Some(&ip_str),
+        Some(&client_ip),
     );
 
     let token = generate_random_hex(32);
@@ -685,9 +888,10 @@ async fn rename_device_handler(
         );
     };
 
+    let safe_name: String = req.device_name.trim().chars().take(64).collect();
     let _ = conn.execute(
         "UPDATE devices SET device_name = ?1 WHERE device_id = ?2 AND user_id = ?3",
-        params![req.device_name.trim(), &target_device_id, &user.id],
+        params![safe_name, &target_device_id, &user.id],
     );
 
     let my_devices = query_user_devices(&conn, &state.peers, &user.id);
@@ -775,7 +979,11 @@ async fn add_contact_handler(
         );
     };
 
-    let trust = req.trust_level.unwrap_or_else(|| "ask".to_string());
+    let raw_trust = req.trust_level.unwrap_or_else(|| "ask".to_string());
+    let trust = match raw_trust.as_str() {
+        "ask" | "trusted_auto_accept" | "blocked" => raw_trust,
+        _ => "ask".to_string(),
+    };
     let now = now_secs() as i64;
     let _ = conn.execute(
         "INSERT INTO user_contacts (owner_user_id, contact_user_id, trust_level, created_at)
@@ -809,6 +1017,10 @@ async fn update_contact_trust_handler(
             Json(json!({ "error": "Unauthorized" })),
         );
     };
+    let trust = match req.trust_level.as_str() {
+        "ask" | "trusted_auto_accept" | "blocked" => req.trust_level.as_str(),
+        _ => "ask",
+    };
     let target_email = req.email.trim().to_lowercase();
     let conn = state.db.lock().unwrap();
     let Some(user) = authenticate_token(&conn, &token) else {
@@ -823,7 +1035,7 @@ async fn update_contact_trust_handler(
          SET trust_level = ?1
          WHERE owner_user_id = ?2
            AND contact_user_id = (SELECT id FROM users WHERE email = ?3)",
-        params![&req.trust_level, &user.id, &target_email],
+        params![trust, &user.id, &target_email],
     );
 
     let contacts = query_user_contacts(&conn, &state.peers, &user.id);
@@ -869,16 +1081,19 @@ fn broadcast_presence_update(state: &ServerState, changed_user_id: &str) {
     .to_string();
 
     for entry in state.peers.iter() {
-        let _ = entry.value().tx.send(notify_msg.clone());
+        let _ = entry.value().tx.try_send(notify_msg.clone());
     }
 }
 
 async fn ws_handler(
     ws: WebSocketUpgrade,
+    headers: HeaderMap,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
     State(state): State<ServerState>,
 ) -> impl IntoResponse {
-    ws.on_upgrade(move |socket| handle_socket(socket, addr, state))
+    let client_ip = extract_client_ip(&headers, addr);
+    ws.max_message_size(MAX_WS_MESSAGE_BYTES)
+        .on_upgrade(move |socket| handle_socket(socket, client_ip, state))
 }
 
 fn verify_registration(
@@ -887,6 +1102,12 @@ fn verify_registration(
     timestamp: u64,
     signature_hex: &str,
 ) -> bool {
+    // Anti-Replay protection: registration timestamp must be within 10 minutes of server clock
+    let now = now_secs();
+    if now.abs_diff(timestamp) > 600 {
+        return false;
+    }
+
     let Ok(pub_bytes) = hex::decode(ed25519_pubkey_hex) else {
         return false;
     };
@@ -920,9 +1141,9 @@ fn verify_registration(
     verifying_key.verify(msg.as_bytes(), &sig).is_ok()
 }
 
-async fn handle_socket(socket: WebSocket, addr: SocketAddr, state: ServerState) {
+async fn handle_socket(socket: WebSocket, client_ip: String, state: ServerState) {
     let (mut ws_tx, mut ws_rx) = socket.split();
-    let (tx, mut rx) = mpsc::unbounded_channel::<String>();
+    let (tx, mut rx) = mpsc::channel::<String>(PEER_CHANNEL_CAPACITY);
 
     let writer_task = tokio::spawn(async move {
         while let Some(msg) = rx.recv().await {
@@ -933,10 +1154,26 @@ async fn handle_socket(socket: WebSocket, addr: SocketAddr, state: ServerState) 
     });
 
     let mut registered_id: Option<String> = None;
+    let mut registered_pubkey: Option<String> = None;
     let mut registered_user_id: Option<String> = None;
+    let mut rate_window = Instant::now();
+    let mut msg_count_in_sec: u32 = 0;
 
     while let Some(Ok(msg)) = ws_rx.next().await {
+        if rate_window.elapsed().as_secs() >= 1 {
+            rate_window = Instant::now();
+            msg_count_in_sec = 0;
+        }
+        msg_count_in_sec += 1;
+        if msg_count_in_sec > MAX_WS_MSGS_PER_SEC {
+            warn!("Rate limit exceeded on WebSocket from {client_ip}");
+            break;
+        }
+
         if let Message::Text(text) = msg {
+            if text.len() > MAX_WS_MESSAGE_BYTES {
+                break;
+            }
             if let Ok(parsed) = serde_json::from_str::<SignalMessage>(&text) {
                 match parsed {
                     SignalMessage::Register {
@@ -950,14 +1187,14 @@ async fn handle_socket(socket: WebSocket, addr: SocketAddr, state: ServerState) 
                         if verify_registration(&device_id, &ed25519_pubkey, timestamp, &signature) {
                             let mut uid_opt = None;
                             let mut email_opt = None;
+                            let safe_alias: String = alias_name.trim().chars().take(64).collect();
 
                             if let Some(tok) = auth_token {
                                 let conn = state.db.lock().unwrap();
                                 if let Some(u) = authenticate_token(&conn, &tok) {
-                                    let ip_s = addr.ip().to_string();
                                     let _ = conn.execute(
-                                        "UPDATE devices SET last_ip = ?1, last_seen_at = ?2 WHERE device_id = ?3",
-                                        params![&ip_s, now_secs() as i64, &device_id],
+                                        "UPDATE devices SET last_ip = ?1, last_seen_at = ?2 WHERE device_id = ?3 AND user_id = ?4",
+                                        params![&client_ip, now_secs() as i64, &device_id, &u.id],
                                     );
                                     uid_opt = Some(u.id);
                                     email_opt = Some(u.email);
@@ -965,7 +1202,7 @@ async fn handle_socket(socket: WebSocket, addr: SocketAddr, state: ServerState) 
                             }
 
                             info!(
-                                "Peer registered: {device_id} ({alias_name}, email={:?}) from {addr}",
+                                "Peer registered: {device_id} ({safe_alias}, email={:?}) from {client_ip}",
                                 email_opt
                             );
                             state.peers.insert(
@@ -973,19 +1210,20 @@ async fn handle_socket(socket: WebSocket, addr: SocketAddr, state: ServerState) 
                                 PeerSession {
                                     user_id: uid_opt.clone(),
                                     user_email: email_opt,
-                                    alias_name: alias_name.clone(),
+                                    alias_name: safe_alias,
                                     ed25519_pubkey: ed25519_pubkey.clone(),
                                     tx: tx.clone(),
                                 },
                             );
                             registered_id = Some(device_id.clone());
+                            registered_pubkey = Some(ed25519_pubkey);
                             registered_user_id = uid_opt.clone();
 
-                            let _ = tx.send(
+                            let _ = tx.try_send(
                                 json!({
                                     "type": "REGISTER_OK",
                                     "device_id": device_id,
-                                    "public_ip": addr.ip().to_string()
+                                    "public_ip": client_ip
                                 })
                                 .to_string(),
                             );
@@ -994,12 +1232,15 @@ async fn handle_socket(socket: WebSocket, addr: SocketAddr, state: ServerState) 
                                 broadcast_presence_update(&state, uid);
                             }
                         } else {
-                            warn!("Invalid Ed25519 registration signature from {addr}");
+                            warn!("Invalid Ed25519 registration signature from {client_ip}");
                         }
                     }
                     SignalMessage::PeerLookup { target_device_id } => {
+                        if registered_id.is_none() {
+                            continue;
+                        }
                         if let Some(peer) = state.peers.get(&target_device_id) {
-                            let _ = tx.send(
+                            let _ = tx.try_send(
                                 json!({
                                     "type": "PEER_STATUS",
                                     "device_id": target_device_id,
@@ -1010,7 +1251,7 @@ async fn handle_socket(socket: WebSocket, addr: SocketAddr, state: ServerState) 
                                 .to_string(),
                             );
                         } else {
-                            let _ = tx.send(
+                            let _ = tx.try_send(
                                 json!({
                                     "type": "PEER_STATUS",
                                     "device_id": target_device_id,
@@ -1029,8 +1270,19 @@ async fn handle_socket(socket: WebSocket, addr: SocketAddr, state: ServerState) 
                         lan_candidates,
                         wan_candidate,
                     } => {
+                        // Anti-spoofing: sender must be cryptographically registered as `from_device_id`
+                        let Some(ref authed_id) = registered_id else {
+                            continue;
+                        };
+                        let Some(ref authed_pk) = registered_pubkey else {
+                            continue;
+                        };
+                        if &from_device_id != authed_id || &from_ed25519_pubkey != authed_pk {
+                            warn!("Blocked spoofed CONNECT_INTENT from {authed_id} claiming {from_device_id}");
+                            continue;
+                        }
                         if let Some(target) = state.peers.get(&target_device_id) {
-                            let _ = target.tx.send(
+                            let _ = target.tx.try_send(
                                 json!({
                                     "type": "CONNECT_INTENT",
                                     "session_id": session_id,
@@ -1053,8 +1305,18 @@ async fn handle_socket(socket: WebSocket, addr: SocketAddr, state: ServerState) 
                         lan_candidates,
                         wan_candidate,
                     } => {
+                        let Some(ref authed_id) = registered_id else {
+                            continue;
+                        };
+                        let Some(ref authed_pk) = registered_pubkey else {
+                            continue;
+                        };
+                        if &from_device_id != authed_id || &from_ed25519_pubkey != authed_pk {
+                            warn!("Blocked spoofed CANDIDATE_ANSWER from {authed_id}");
+                            continue;
+                        }
                         if let Some(initiator) = state.peers.get(&target_device_id) {
-                            let _ = initiator.tx.send(
+                            let _ = initiator.tx.try_send(
                                 json!({
                                     "type": "CANDIDATE_ANSWER",
                                     "session_id": session_id,
@@ -1072,7 +1334,7 @@ async fn handle_socket(socket: WebSocket, addr: SocketAddr, state: ServerState) 
                                 "peer_wan_candidate": wan_candidate
                             })
                             .to_string();
-                            let _ = initiator.tx.send(punch_msg);
+                            let _ = initiator.tx.try_send(punch_msg);
                         }
                     }
                     SignalMessage::RelayControl {
@@ -1081,8 +1343,15 @@ async fn handle_socket(socket: WebSocket, addr: SocketAddr, state: ServerState) 
                         target_device_id,
                         payload_json,
                     } => {
+                        let Some(ref authed_id) = registered_id else {
+                            continue;
+                        };
+                        if &from_device_id != authed_id {
+                            warn!("Blocked spoofed RELAY_CONTROL from {authed_id}");
+                            continue;
+                        }
                         if let Some(target) = state.peers.get(&target_device_id) {
-                            let _ = target.tx.send(
+                            let _ = target.tx.try_send(
                                 json!({
                                     "type": "RELAY_CONTROL",
                                     "session_id": session_id,
