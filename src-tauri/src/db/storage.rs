@@ -344,6 +344,16 @@ impl Database {
         Ok(())
     }
 
+    pub fn update_contact_lan(&self, device_id: &str, ip: &str, port: u16) -> Result<(), String> {
+        let conn = self.conn.lock().map_err(|e| e.to_string())?;
+        conn.execute(
+            "UPDATE contacts SET last_known_ip = ?1, last_known_port = ?2, network_type = 'lan', is_online = 1, last_seen_at = ?3 WHERE device_id = ?4",
+            params![ip, port as i32, now_unix_secs() as i64, device_id],
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
     pub fn get_contact(&self, device_id: &str) -> Result<Option<Contact>, String> {
         let conn = self.conn.lock().map_err(|e| e.to_string())?;
         conn.query_row(

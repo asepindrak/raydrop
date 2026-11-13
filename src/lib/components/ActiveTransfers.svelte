@@ -36,7 +36,9 @@
 
   function calcPercent(transferred: number, total: number): number {
     if (total <= 0) return 0;
-    return Math.min(100, Math.round((transferred / total) * 100));
+    const pct = (transferred / total) * 100;
+    if (pct > 0 && pct < 1) return 1;
+    return Math.min(100, Math.round(pct));
   }
 
   function formatTransferTime(unixSecs: number): string {

@@ -152,7 +152,7 @@ async fn handle_signaling_message(app: &AppHandle, state: &Arc<AppState>, text: 
                 .await
                 .or_else(|| state.wan_reflexive_addr.lock().unwrap().clone());
 
-            let my_lan = vec![format!("{}:{}", state.local_ip, state.listen_port)];
+            let my_lan = crate::network::transport::collect_all_lan_addresses(state.listen_port);
 
             if let Some(tx) = state.signaling_tx.lock().unwrap().as_ref() {
                 let answer = json!({

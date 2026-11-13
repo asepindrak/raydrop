@@ -63,6 +63,36 @@ async fn compute_file_blake3(path: &Path) -> Result<String, String> {
     Ok(hasher.finalize().to_hex().to_string())
 }
 
+/// Discovers and collects all valid local IPv4 network interface addresses on this machine,
+/// prioritizing standard private LAN subnets (192.168.x.x, 10.x.x.x, 172.16-31.x.x).
+pub fn collect_all_lan_addresses(port: u16) -> Vec<String> {
+    let mut addrs = Vec::new();
+    if let Ok(ifaces) = local_ip_address::list_afinet_netifas() {
+        for (_, ip) in ifaces {
+            if let std::net::IpAddr::V4(ipv4) = ip {
+                if !ipv4.is_loopback() && !ipv4.is_unspecified() {
+                    let addr_str = format!("{}:{}", ipv4, port);
+                    if !addrs.contains(&addr_str) {
+                        let octets = ipv4.octets();
+                        let is_private = octets[0] == 192 && octets[1] == 168
+                            || octets[0] == 10
+                            || (octets[0] == 172 && (16..=31).contains(&octets[1]));
+                        if is_private {
+                            addrs.insert(0, addr_str);
+                        } else {
+                            addrs.push(addr_str);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    if addrs.is_empty() {
+        addrs.push(format!("127.0.0.1:{}", port));
+    }
+    addrs
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 struct HelloFrame {
     #[serde(rename = "type")]
@@ -407,7 +437,7 @@ pub(crate) fn create_ws_relay_stream(
     let target_id = peer_device_id;
 
     tauri::async_runtime::spawn(async move {
-        let mut buf = vec![0u8; 24 * 1024];
+        let mut buf = vec![0u8; 128 * 1024];
         loop {
             match bridge_read.read(&mut buf).await {
                 Ok(0) | Err(_) => {
@@ -766,6 +796,7 @@ where
     let start_time = Instant::now();
     let mut last_emit = Instant::now();
     let mut last_db_sync = Instant::now();
+    let mut last_ack_sent = Instant::now();
     let mut completed_files = 0usize;
     let mut open_handles: HashMap<u32, File> = HashMap::new();
 
@@ -859,6 +890,19 @@ where
                         .await
                         .map_err(|e| e.to_string())?;
                     completed_files += 1;
+                    // Immediately notify sender of file completion
+                    let _ = write_json_packet(
+                        &mut writer,
+                        &ReceiverProgressFrame {
+                            frame_type: "RECEIVER_PROGRESS".to_string(),
+                            session_id: record.id.clone(),
+                            transferred_bytes: record.transferred_bytes,
+                            completed_files,
+                            done: completed_files >= manifest.total_files,
+                        },
+                    )
+                    .await;
+                    last_ack_sent = Instant::now();
                 }
             }
         } else {
@@ -887,18 +931,21 @@ where
                     (record.transferred_bytes + plaintext.len() as u64).min(record.total_bytes);
             }
 
-            // Send real-time RECEIVER_PROGRESS ACK back to sender so sender progress matches receiver 1:1
-            let _ = write_json_packet(
-                &mut writer,
-                &ReceiverProgressFrame {
-                    frame_type: "RECEIVER_PROGRESS".to_string(),
-                    session_id: record.id.clone(),
-                    transferred_bytes: record.transferred_bytes,
-                    completed_files,
-                    done: false,
-                },
-            )
-            .await;
+            // Send real-time RECEIVER_PROGRESS ACK at reasonable interval (every 120ms) to avoid flooding socket
+            if last_ack_sent.elapsed() >= Duration::from_millis(120) {
+                let _ = write_json_packet(
+                    &mut writer,
+                    &ReceiverProgressFrame {
+                        frame_type: "RECEIVER_PROGRESS".to_string(),
+                        session_id: record.id.clone(),
+                        transferred_bytes: record.transferred_bytes,
+                        completed_files,
+                        done: false,
+                    },
+                )
+                .await;
+                last_ack_sent = Instant::now();
+            }
 
             if last_db_sync.elapsed() >= Duration::from_millis(1200) {
                 let _ = state.db.upsert_transfer(&record);
@@ -1288,7 +1335,7 @@ async fn run_outgoing_session(
     let my_wan = discover_wan_reflexive_address(state.listen_port, &stun_addr)
         .await
         .or_else(|| state.wan_reflexive_addr.lock().unwrap().clone());
-    let my_lan = vec![format!("{}:{}", state.local_ip, state.listen_port)];
+    let my_lan = collect_all_lan_addresses(state.listen_port);
     let my_alias = state.settings.lock().unwrap().alias_name.clone();
 
     let (cand_tx, cand_rx) = oneshot::channel();
@@ -1315,13 +1362,16 @@ async fn run_outgoing_session(
         // 2a. Try Peer's LAN Candidates via Direct TCP first (works when both PCs are on the same Wi-Fi/LAN)
         for lan_cand in &answer.lan_candidates {
             if let Ok(Ok(tcp_stream)) = tokio::time::timeout(
-                Duration::from_millis(1000),
+                Duration::from_millis(1200),
                 TcpStream::connect(lan_cand),
             )
             .await
             {
                 let _ = tcp_stream.set_nodelay(true);
                 let (reader, writer) = tokio::io::split(tcp_stream);
+                if let Ok(sock_addr) = lan_cand.parse::<SocketAddr>() {
+                    let _ = state.db.update_contact_lan(&fresh_contact.device_id, &sock_addr.ip().to_string(), sock_addr.port());
+                }
                 return stream_outgoing_files(
                     app,
                     state,
@@ -1719,17 +1769,6 @@ where
                         return Err("Outgoing transfer paused/cancelled".to_string());
                     }
 
-                    // Sliding-window flow control: keep at most 4 MB (8 chunks) in-flight ahead of receiver's disk writes
-                    while has_ack_s.load(Ordering::Relaxed)
-                        && !cancel_s.load(Ordering::Relaxed)
-                        && !done_s.load(Ordering::Relaxed)
-                        && !closed_s.load(Ordering::Relaxed)
-                        && local_sent_bytes.saturating_sub(acked_s.load(Ordering::Relaxed))
-                            >= 4 * 1024 * 1024
-                    {
-                        tokio::time::sleep(Duration::from_millis(12)).await;
-                    }
-
                     let (header, ciphertext, plain_len) = match frame_res {
                         Ok(t) => t,
                         Err(e) => {
@@ -1748,43 +1787,47 @@ where
 
                     local_sent_bytes = (local_sent_bytes + plain_len as u64).min(total_bytes);
 
-                    // Fallback progress emission only if peer is an older client that hasn't sent RECEIVER_PROGRESS yet
-                    if !has_ack_s.load(Ordering::Relaxed) {
-                        if last_db_s.elapsed() >= Duration::from_millis(1200) {
-                            let mut db_rec = base_rec_s.clone();
-                            db_rec.transferred_bytes = local_sent_bytes;
-                            let _ = state_s.db.upsert_transfer(&db_rec);
-                            last_db_s = Instant::now();
-                        }
+                    let effective_bytes = if has_ack_s.load(Ordering::Relaxed) {
+                        let a = acked_s.load(Ordering::Relaxed);
+                        if a > 0 { a } else { local_sent_bytes }
+                    } else {
+                        local_sent_bytes
+                    };
 
-                        if last_emit_s.elapsed() >= Duration::from_millis(120) {
-                            let elapsed = start_time.elapsed().as_secs_f64().max(0.001);
-                            let session_delta = local_sent_bytes.saturating_sub(already_sent_bytes);
-                            let speed_mbps = (session_delta as f64 / (1024.0 * 1024.0)) / elapsed;
-                            let remaining = total_bytes.saturating_sub(local_sent_bytes);
-                            let eta_seconds = if speed_mbps > 0.01 {
-                                ((remaining as f64 / (1024.0 * 1024.0)) / speed_mbps) as u64
-                            } else {
-                                0
-                            };
+                    if last_db_s.elapsed() >= Duration::from_millis(1200) {
+                        let mut db_rec = base_rec_s.clone();
+                        db_rec.transferred_bytes = effective_bytes;
+                        let _ = state_s.db.upsert_transfer(&db_rec);
+                        last_db_s = Instant::now();
+                    }
 
-                            let _ = app_s.emit(
-                                "transfer_progress",
-                                &TransferProgressEvent {
-                                    session_id: base_rec_s.id.clone(),
-                                    peer_device_id: base_rec_s.peer_device_id.clone(),
-                                    peer_alias: base_rec_s.peer_alias.clone(),
-                                    direction: "outgoing".to_string(),
-                                    network_route: base_rec_s.network_route.clone(),
-                                    transferred_bytes: local_sent_bytes,
-                                    total_bytes,
-                                    speed_mbps,
-                                    eta_seconds,
-                                    status: "in_progress".to_string(),
-                                },
-                            );
-                            last_emit_s = Instant::now();
-                        }
+                    if last_emit_s.elapsed() >= Duration::from_millis(120) {
+                        let elapsed = start_time.elapsed().as_secs_f64().max(0.001);
+                        let session_delta = effective_bytes.saturating_sub(already_sent_bytes);
+                        let speed_mbps = (session_delta as f64 / (1024.0 * 1024.0)) / elapsed;
+                        let remaining = total_bytes.saturating_sub(effective_bytes);
+                        let eta_seconds = if speed_mbps > 0.01 {
+                            ((remaining as f64 / (1024.0 * 1024.0)) / speed_mbps) as u64
+                        } else {
+                            0
+                        };
+
+                        let _ = app_s.emit(
+                            "transfer_progress",
+                            &TransferProgressEvent {
+                                session_id: base_rec_s.id.clone(),
+                                peer_device_id: base_rec_s.peer_device_id.clone(),
+                                peer_alias: base_rec_s.peer_alias.clone(),
+                                direction: "outgoing".to_string(),
+                                network_route: base_rec_s.network_route.clone(),
+                                transferred_bytes: effective_bytes,
+                                total_bytes,
+                                speed_mbps,
+                                eta_seconds,
+                                status: "in_progress".to_string(),
+                            },
+                        );
+                        last_emit_s = Instant::now();
                     }
                 }
             }

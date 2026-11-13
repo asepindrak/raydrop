@@ -31,7 +31,7 @@ const PEER_CHANNEL_CAPACITY: usize = 256; // Bounded per-peer queue to prevent V
 const AUTH_RATE_WINDOW_SECS: u64 = 300; // 5-minute window
 const MAX_AUTH_ATTEMPTS_PER_WINDOW: u32 = 10; // Max 10 failed login/register attempts per 5 mins per IP
 const AUTH_LOCKOUT_SECS: u64 = 600; // 10-minute temporary ban on brute-force
-const MAX_WS_MSGS_PER_SEC: u32 = 160; // Per-socket message flood limit
+const MAX_WS_MSGS_PER_SEC: u32 = 2500; // Per-socket message flood limit (generous for high-throughput E2EE relay stream frames)
 
 #[derive(Clone)]
 struct RateLimitBucket {
