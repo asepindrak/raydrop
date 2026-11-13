@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import { get } from "svelte/store";
   import { getCurrentWindow, UserAttentionType } from "@tauri-apps/api/window";
   import { getCurrentWebview } from "@tauri-apps/api/webview";
   import Header from "./lib/components/Header.svelte";
@@ -10,7 +11,7 @@
   import TraySettings from "./lib/components/TraySettings.svelte";
   import AuthModal from "./lib/components/AuthModal.svelte";
   import UpdateModal from "./lib/components/UpdateModal.svelte";
-  import { Upload } from "lucide-svelte";
+  import { Upload, X } from "lucide-svelte";
   import {
     appSettings,
     deviceCryptoMeta,
@@ -28,6 +29,9 @@
     fetchUnreadCounts,
     handleIncomingChatMessage,
     markChatRead,
+    chatToasts,
+    addChatToast,
+    removeChatToast,
   } from "./lib/stores/chat";
   import { contacts } from "./lib/stores/contacts";
   import {
@@ -211,6 +215,11 @@
       if ($activeMainTab === "chat" && $activeChatPeerId === msg.peer_device_id) {
         await markChatRead(msg.peer_device_id);
       } else {
+        const contactList = get(contacts);
+        const peer = contactList.find((c) => c.device_id === msg.peer_device_id);
+        const peerName = peer?.alias_name || peer?.user_name || msg.peer_device_id.slice(0, 14);
+        addChatToast(msg, peerName);
+
         try {
           const win = getCurrentWindow();
           await win.requestUserAttention(UserAttentionType.Informational);
@@ -301,6 +310,56 @@
           <span>⚡ Unlimited Size • Resumable • Zero Cloud Storage</span>
         </div>
       </div>
+    </div>
+  {/if}
+
+  <!-- In-app Floating Chat Toast Notifications (Bottom-Right) -->
+  {#if $chatToasts.length > 0}
+    <div class="fixed bottom-6 right-6 z-50 flex flex-col gap-2.5 max-w-sm pointer-events-auto">
+      {#each $chatToasts as toast (toast.id)}
+        <div
+          role="button"
+          tabindex="0"
+          on:click={() => {
+            activeMainTab.set("chat");
+            activeChatPeerId.set(toast.peerDeviceId);
+            removeChatToast(toast.id);
+          }}
+          on:keydown={(e) => {
+            if (e.key === "Enter") {
+              activeMainTab.set("chat");
+              activeChatPeerId.set(toast.peerDeviceId);
+              removeChatToast(toast.id);
+            }
+          }}
+          class="p-4 rounded-2xl bg-slate-900/95 border border-cyan-500/50 shadow-2xl shadow-cyan-500/20 backdrop-blur-xl flex items-start justify-between gap-3 cursor-pointer hover:border-cyan-400 hover:scale-[1.02] transition-all transform animate-in slide-in-from-bottom duration-200"
+        >
+          <div class="flex items-start gap-3 min-w-0">
+            <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-cyan-500/20 to-indigo-500/20 border border-cyan-500/40 flex items-center justify-center text-cyan-300 font-bold text-xs shrink-0 mt-0.5">
+              {toast.peerName.slice(0, 2).toUpperCase()}
+            </div>
+            <div class="min-w-0">
+              <div class="flex items-center gap-1.5">
+                <span class="text-xs font-bold text-white truncate">{toast.peerName}</span>
+                <span class="text-[10px] text-cyan-400 font-mono">Pesan Baru</span>
+              </div>
+              <p class="text-xs text-slate-300 truncate mt-0.5 max-w-[220px]">
+                {toast.content}
+              </p>
+              <span class="text-[10px] text-cyan-400/80 font-mono mt-1 block">
+                Klik untuk buka chat &rarr;
+              </span>
+            </div>
+          </div>
+          <button
+            type="button"
+            on:click|stopPropagation={() => removeChatToast(toast.id)}
+            class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition shrink-0"
+          >
+            <X class="w-3.5 h-3.5" />
+          </button>
+        </div>
+      {/each}
     </div>
   {/if}
 

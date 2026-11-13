@@ -578,10 +578,14 @@ impl Database {
         let mut stmt = conn
             .prepare(
                 "SELECT id, peer_device_id, direction, content, msg_type, transfer_session_id, files_json, is_read, created_at
-                 FROM chat_messages
-                 WHERE peer_device_id = ?1
-                 ORDER BY created_at ASC
-                 LIMIT ?2 OFFSET ?3",
+                 FROM (
+                     SELECT id, peer_device_id, direction, content, msg_type, transfer_session_id, files_json, is_read, created_at
+                     FROM chat_messages
+                     WHERE peer_device_id = ?1
+                     ORDER BY created_at DESC
+                     LIMIT ?2 OFFSET ?3
+                 )
+                 ORDER BY created_at ASC",
             )
             .map_err(|e| e.to_string())?;
 

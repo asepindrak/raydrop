@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount, tick, onDestroy } from 'svelte';
   import { open } from '@tauri-apps/plugin-dialog';
+  import { convertFileSrc } from '@tauri-apps/api/core';
   import {
     Send,
     Paperclip,
@@ -24,17 +25,28 @@
     X,
     User,
     ArrowUpRight,
-    ArrowDownLeft
+    ArrowDownLeft,
+    Smile,
+    Copy,
+    Shield,
+    ShieldAlert,
+    ShieldCheck,
+    Ban,
+    Image as ImageIcon
   } from 'lucide-svelte';
   import { contacts, lanContacts } from '../stores/contacts';
-  import { cloudContacts, cloudMyDevices, activeChatPeerId } from '../stores/state';
+  import { cloudContacts, cloudMyDevices, activeChatPeerId, appSettings } from '../stores/state';
   import {
     chatStore,
     unreadCounts,
+    hasMoreMap,
+    isLoadingOlder,
     loadChatHistory,
+    loadOlderMessages,
     markChatRead,
     clearChatHistory,
-    handleOutgoingChatMessage
+    handleOutgoingChatMessage,
+    formatRelativeTime
   } from '../stores/chat';
   import { transfers } from '../stores/transfers';
   import {
@@ -49,9 +61,37 @@
   let messageInput = '';
   let searchQuery = '';
   let chatScrollContainer: HTMLDivElement;
+  let textareaEl: HTMLTextAreaElement;
   let isSending = false;
   let copiedMessageId = '';
   let attachingFiles: string[] = [];
+  let showEmojiPicker = false;
+  let relativeTimeTicker = 0;
+
+  // Update relative time strings every 15 seconds
+  const tickerInterval = setInterval(() => {
+    relativeTimeTicker += 1;
+  }, 15000);
+
+  onDestroy(() => {
+    clearInterval(tickerInterval);
+  });
+
+  // Emojis for picker
+  const emojiCategories = [
+    {
+      name: 'Smileys',
+      emojis: ['😀', '😂', '🤣', '😊', '😍', '😎', '🤔', '🤫', '🥳', '🥺', '😭', '😇', '😴'],
+    },
+    {
+      name: 'Gestures',
+      emojis: ['👍', '👎', '👏', '🙌', '🤝', '🙏', '✌️', '🚀', '🔥', '💯', '⚡', '❤️', '💡'],
+    },
+    {
+      name: 'Tech & Work',
+      emojis: ['💻', '📱', '🖥️', '📂', '📁', '📄', '🔒', '🛡️', '🌐', '📶', '⚙️', '☕', '✅', '❌'],
+    },
+  ];
 
   $: allPeers = [
     ...$contacts.map((c) => ({
@@ -62,6 +102,7 @@
       isOnline: c.is_online,
       networkType: c.network_type || 'wan',
       isOwnDevice: c.is_own_device,
+      trustLevel: c.trust_level || 'ask',
     })),
   ].filter((p, index, self) => index === self.findIndex((t) => t.id === p.id));
 
@@ -73,6 +114,11 @@
 
   $: activePeer = allPeers.find((p) => p.id === $activeChatPeerId) || null;
   $: activeMessages = ($activeChatPeerId ? $chatStore[$activeChatPeerId] : []) || [];
+  $: hasMore = $activeChatPeerId ? !!$hasMoreMap[$activeChatPeerId] : false;
+  $: isPeerBlocked = activePeer?.trustLevel === 'blocked';
+
+  // Reactive Map of all transfers for 100% reactive progress updates
+  $: transferMap = new Map($transfers.map((t) => [t.id, t]));
 
   // Auto-select first peer if none selected
   $: if (!$activeChatPeerId && filteredPeers.length > 0) {
@@ -88,9 +134,14 @@
     });
   }
 
-  // Scroll to bottom when new messages arrive
-  $: if (activeMessages.length) {
-    tick().then(() => scrollToBottom());
+  // Auto-scroll to bottom when new messages arrive
+  let prevMsgCount = 0;
+  $: if (activeMessages.length !== prevMsgCount) {
+    const isInitialOrNewOutgoing = activeMessages.length > prevMsgCount && (prevMsgCount === 0 || activeMessages[activeMessages.length - 1]?.direction === 'outgoing');
+    prevMsgCount = activeMessages.length;
+    if (isInitialOrNewOutgoing) {
+      tick().then(() => scrollToBottom());
+    }
   }
 
   function scrollToBottom() {
@@ -99,32 +150,64 @@
     }
   }
 
+  // Infinite Scroll Pagination: load older messages when user scrolls near top
+  async function handleScroll() {
+    if (!chatScrollContainer || !$activeChatPeerId || $isLoadingOlder || !hasMore) return;
+    if (chatScrollContainer.scrollTop < 60) {
+      const prevScrollHeight = chatScrollContainer.scrollHeight;
+      const loadedCount = await loadOlderMessages($activeChatPeerId);
+      if (loadedCount > 0) {
+        await tick();
+        chatScrollContainer.scrollTop = chatScrollContainer.scrollHeight - prevScrollHeight;
+      }
+    }
+  }
+
   function getBaseName(path: string): string {
     const parts = path.split(/[/\\]/);
     return parts[parts.length - 1] || path;
   }
 
-  function getFileTypeBadge(filename: string): { label: string; color: string } {
+  function parseFilePaths(sourcePathsJson?: string | null): string[] {
+    if (!sourcePathsJson) return [];
+    try {
+      const parsed = JSON.parse(sourcePathsJson);
+      if (Array.isArray(parsed)) {
+        return parsed.filter((x) => typeof x === 'string' && x.trim().length > 0);
+      }
+      if (typeof parsed === 'string' && parsed.trim().length > 0) {
+        return [parsed.trim()];
+      }
+    } catch {
+      if (typeof sourcePathsJson === 'string' && sourcePathsJson.trim().length > 0) {
+        return [sourcePathsJson.trim()];
+      }
+    }
+    return [];
+  }
+
+  function getFileTypeBadge(filename: string): { label: string; color: string; isImage: boolean } {
     const ext = filename.split('.').pop()?.toUpperCase() || 'FILE';
+    const isImage = ['JPG', 'JPEG', 'PNG', 'WEBP', 'SVG', 'GIF', 'BMP', 'ICO'].includes(ext);
     if (['SQL', 'DB', 'SQLITE'].includes(ext)) {
-      return { label: ext, color: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' };
+      return { label: ext, color: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40', isImage: false };
     }
     if (['ZIP', 'RAR', '7Z', 'TAR', 'GZ'].includes(ext)) {
-      return { label: ext, color: 'bg-amber-500/20 text-amber-300 border-amber-500/40' };
+      return { label: ext, color: 'bg-amber-500/20 text-amber-300 border-amber-500/40', isImage: false };
     }
     if (['MP4', 'MKV', 'MOV', 'AVI', 'WEBM'].includes(ext)) {
-      return { label: ext, color: 'bg-purple-500/20 text-purple-300 border-purple-500/40' };
+      return { label: ext, color: 'bg-purple-500/20 text-purple-300 border-purple-500/40', isImage: false };
     }
-    if (['JPG', 'JPEG', 'PNG', 'WEBP', 'SVG', 'GIF'].includes(ext)) {
-      return { label: ext, color: 'bg-pink-500/20 text-pink-300 border-pink-500/40' };
+    if (isImage) {
+      return { label: ext, color: 'bg-pink-500/20 text-pink-300 border-pink-500/40', isImage: true };
     }
     if (['PDF', 'DOC', 'DOCX', 'XLS', 'XLSX', 'PPTX'].includes(ext)) {
-      return { label: ext, color: 'bg-blue-500/20 text-blue-300 border-blue-500/40' };
+      return { label: ext, color: 'bg-blue-500/20 text-blue-300 border-blue-500/40', isImage: false };
     }
     if (['RS', 'TS', 'JS', 'PY', 'GO', 'CPP', 'C', 'HTML', 'CSS', 'JSON', 'SH'].includes(ext)) {
-      return { label: ext, color: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40' };
+      return { label: ext, color: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40', isImage: false };
     }
-    return { label: ext.slice(0, 4), color: 'bg-slate-800 text-slate-300 border-slate-700' };
+    return { label: ext.slice(0, 4), color: 'bg-slate-800 text-slate-300 border-slate-700', isImage: false };
   }
 
   function parseFilesJson(jsonStr?: string | null): ChatFileItem[] {
@@ -138,9 +221,38 @@
     return [];
   }
 
-  function getLinkedTransfer(sessionId?: string | null): TransferRecord | undefined {
-    if (!sessionId) return undefined;
-    return $transfers.find((t) => t.id === sessionId);
+  // Resolve accurate local file path for both sender and recipient
+  function resolveLocalFilePath(
+    f: ChatFileItem,
+    isOutgoing: boolean,
+    linkedTransfer?: TransferRecord
+  ): string | null {
+    if (isOutgoing && f.path) {
+      return f.path;
+    }
+
+    if (linkedTransfer) {
+      if (linkedTransfer.source_paths) {
+        const paths = parseFilePaths(linkedTransfer.source_paths);
+        const match = paths.find(
+          (p) => getBaseName(p).toLowerCase() === f.name.toLowerCase()
+        );
+        if (match) return match;
+      }
+
+      const dir = linkedTransfer.target_path || $appSettings.download_dir;
+      if (dir) {
+        const sep = dir.includes('/') ? '/' : '\\';
+        return `${dir.replace(/[/\\]$/, '')}${sep}${f.name}`;
+      }
+    }
+
+    if ($appSettings.download_dir) {
+      const sep = $appSettings.download_dir.includes('/') ? '/' : '\\';
+      return `${$appSettings.download_dir.replace(/[/\\]$/, '')}${sep}${f.name}`;
+    }
+
+    return null;
   }
 
   async function handlePickFiles() {
@@ -177,12 +289,35 @@
     attachingFiles = attachingFiles.filter((_, i) => i !== index);
   }
 
+  function insertEmoji(emoji: string) {
+    if (!textareaEl) {
+      messageInput += emoji;
+      return;
+    }
+    const start = textareaEl.selectionStart || 0;
+    const end = textareaEl.selectionEnd || 0;
+    messageInput = messageInput.slice(0, start) + emoji + messageInput.slice(end);
+    tick().then(() => {
+      textareaEl.focus();
+      textareaEl.selectionStart = textareaEl.selectionEnd = start + emoji.length;
+      autoResizeTextarea();
+    });
+  }
+
+  function autoResizeTextarea() {
+    if (!textareaEl) return;
+    textareaEl.style.height = 'auto';
+    const newH = Math.min(textareaEl.scrollHeight, 140);
+    textareaEl.style.height = `${Math.max(38, newH)}px`;
+  }
+
   async function handleSendMessage() {
-    if (!$activeChatPeerId) return;
+    if (!$activeChatPeerId || isPeerBlocked) return;
     const text = messageInput.trim();
     if (!text && attachingFiles.length === 0) return;
 
     isSending = true;
+    showEmojiPicker = false;
     try {
       let transferSessionId: string | null = null;
       let filesJson: string | null = null;
@@ -215,6 +350,9 @@
       handleOutgoingChatMessage(sentMsg);
       messageInput = '';
       attachingFiles = [];
+      if (textareaEl) {
+        textareaEl.style.height = 'auto';
+      }
       await tick();
       scrollToBottom();
     } catch (err) {
@@ -231,7 +369,8 @@
     }
   }
 
-  async function handleOpenFile(path: string) {
+  async function handleOpenFile(path: string | null) {
+    if (!path) return;
     try {
       await raydropApi.openFilePath(path);
     } catch (err) {
@@ -239,7 +378,8 @@
     }
   }
 
-  async function handleOpenFolder(path: string) {
+  async function handleOpenFolder(path: string | null) {
+    if (!path) return;
     try {
       await raydropApi.openFolderPath(path);
     } catch (err) {
@@ -254,17 +394,38 @@
     }
   }
 
-  function formatTime(unixSecs: number): string {
-    const d = new Date(unixSecs * 1000);
-    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  async function toggleBlockPeer() {
+    if (!activePeer) return;
+    const newTrust = isPeerBlocked ? 'ask' : 'blocked';
+    try {
+      await raydropApi.updateContactTrust(
+        activePeer.id,
+        newTrust,
+        activePeer.email || null
+      );
+      contacts.set(await raydropApi.getContacts());
+    } catch (err) {
+      console.warn('Failed to update peer trust:', err);
+    }
   }
 
-  function copyCodeSnippet(text: string, id: string) {
-    navigator.clipboard.writeText(text);
+  function copyMessageText(content: string, id: string) {
+    navigator.clipboard.writeText(content);
     copiedMessageId = id;
     setTimeout(() => {
       copiedMessageId = '';
     }, 1800);
+  }
+
+  // Intercept links in Markdown to open via system browser instead of webview
+  async function handleMarkdownClick(e: MouseEvent) {
+    const target = (e.target as HTMLElement)?.closest('a');
+    if (!target) return;
+    const href = target.getAttribute('href');
+    if (href && (href.startsWith('http://') || href.startsWith('https://'))) {
+      e.preventDefault();
+      await raydropApi.openExternalUrl(href);
+    }
   }
 </script>
 
@@ -296,6 +457,8 @@
         {#each filteredPeers as peer (peer.id)}
           {@const isSelected = $activeChatPeerId === peer.id}
           {@const unread = $unreadCounts[peer.id] || 0}
+          {@const blocked = peer.trustLevel === 'blocked'}
+
           <button
             type="button"
             on:click={() => {
@@ -303,7 +466,7 @@
             }}
             class="w-full text-left p-3 rounded-xl transition-all flex items-center justify-between gap-2.5 {isSelected
               ? 'bg-gradient-to-r from-cyan-500/20 to-indigo-500/20 border border-cyan-500/40 shadow-sm shadow-cyan-500/10'
-              : 'hover:bg-slate-900/80 border border-transparent'}"
+              : 'hover:bg-slate-900/80 border border-transparent'} {blocked ? 'opacity-60' : ''}"
           >
             <div class="flex items-center gap-3 min-w-0">
               <!-- Avatar / Status Ring -->
@@ -311,7 +474,11 @@
                 <div class="w-9 h-9 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-xs text-cyan-300">
                   {peer.name.slice(0, 2).toUpperCase()}
                 </div>
-                {#if peer.isOnline}
+                {#if blocked}
+                  <span class="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-rose-500 border-2 border-slate-950 flex items-center justify-center">
+                    <span class="w-1.5 h-0.5 bg-white"></span>
+                  </span>
+                {:else if peer.isOnline}
                   <span class="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 border-2 border-slate-950 shadow-sm shadow-emerald-500/50"></span>
                 {:else}
                   <span class="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-slate-600 border-2 border-slate-950"></span>
@@ -326,6 +493,9 @@
                   </span>
                   {#if peer.isOwnDevice}
                     <span class="text-[9px] px-1 rounded bg-indigo-500/20 text-indigo-300 font-mono">You</span>
+                  {/if}
+                  {#if blocked}
+                    <span class="text-[9px] px-1 rounded bg-rose-500/20 text-rose-300 font-mono">Blocked</span>
                   {/if}
                 </div>
                 <div class="flex items-center gap-1.5 text-[11px] text-slate-400 mt-0.5">
@@ -387,6 +557,11 @@
               <span class="text-[10px] px-1.5 py-0.2 rounded bg-slate-800 text-slate-300 font-mono">
                 {activePeer.networkType.toUpperCase()}
               </span>
+              {#if isPeerBlocked}
+                <span class="text-[10px] px-1.5 py-0.2 rounded bg-rose-500/20 text-rose-300 font-mono font-bold">
+                  BLOCKED
+                </span>
+              {/if}
             </div>
             <p class="text-[11px] text-slate-400 truncate font-mono">
               {activePeer.email || activePeer.id}
@@ -394,11 +569,30 @@
           </div>
         </div>
 
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-1.5">
+          <!-- Block / Unblock Button -->
+          <button
+            type="button"
+            on:click={toggleBlockPeer}
+            class="px-2.5 py-1 rounded-xl text-xs font-semibold border transition flex items-center gap-1 {isPeerBlocked
+              ? 'bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border-emerald-500/30'
+              : 'bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border-rose-500/20'}"
+            title={isPeerBlocked ? 'Unblock this peer' : 'Block this peer'}
+          >
+            {#if isPeerBlocked}
+              <ShieldCheck class="w-3.5 h-3.5" />
+              <span>Unblock</span>
+            {:else}
+              <Ban class="w-3.5 h-3.5" />
+              <span>Block</span>
+            {/if}
+          </button>
+
+          <!-- Clear Chat History -->
           <button
             type="button"
             on:click={handleClearHistory}
-            class="p-2 rounded-xl text-slate-400 hover:text-rose-400 hover:bg-slate-900 border border-transparent hover:border-slate-800 transition"
+            class="p-1.5 rounded-xl text-slate-400 hover:text-rose-400 hover:bg-slate-900 border border-transparent hover:border-slate-800 transition"
             title="Clear Chat History with this peer"
           >
             <Trash2 class="w-4 h-4" />
@@ -406,11 +600,33 @@
         </div>
       </header>
 
-      <!-- Message History Stream -->
+      <!-- Message History Stream with Infinite Scroll -->
+      <!-- svelte-ignore a11y-click-events-have-key-events -->
+      <!-- svelte-ignore a11y-no-static-element-interactions -->
       <div
         bind:this={chatScrollContainer}
-        class="flex-1 overflow-y-auto p-4 space-y-3.5 scroll-smooth"
+        on:scroll={handleScroll}
+        on:click={handleMarkdownClick}
+        class="flex-1 overflow-y-auto p-4 space-y-3.5 scroll-smooth relative"
       >
+        <!-- Pagination Loading Indicator at Top -->
+        {#if $isLoadingOlder}
+          <div class="flex items-center justify-center py-2 text-xs text-slate-400 gap-1.5 font-mono">
+            <RefreshCw class="w-3.5 h-3.5 animate-spin text-cyan-400" />
+            <span>Loading older messages...</span>
+          </div>
+        {:else if hasMore}
+          <div class="text-center py-1">
+            <button
+              type="button"
+              on:click={() => loadOlderMessages(activePeer.id)}
+              class="text-[11px] text-cyan-400/80 hover:text-cyan-300 hover:underline font-mono"
+            >
+              Scroll up or click to load older messages &uarr;
+            </button>
+          </div>
+        {/if}
+
         {#if activeMessages.length === 0}
           <div class="h-full flex flex-col items-center justify-center text-center p-8">
             <div class="w-12 h-12 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 mb-3">
@@ -425,14 +641,28 @@
           {#each activeMessages as msg (msg.id)}
             {@const isOutgoing = msg.direction === 'outgoing'}
             {@const files = parseFilesJson(msg.files_json)}
-            {@const linkedTransfer = getLinkedTransfer(msg.transfer_session_id)}
+            {@const linkedTransfer = msg.transfer_session_id ? transferMap.get(msg.transfer_session_id) : undefined}
 
-            <div class="flex flex-col {isOutgoing ? 'items-end' : 'items-start'}">
+            <div class="flex flex-col {isOutgoing ? 'items-end' : 'items-start'} group">
               <div
-                class="max-w-[85%] sm:max-w-[75%] rounded-2xl p-3.5 text-xs shadow-lg transition-all {isOutgoing
+                class="max-w-[85%] sm:max-w-[75%] rounded-2xl p-3.5 text-xs shadow-lg transition-all relative {isOutgoing
                   ? 'bg-gradient-to-tr from-cyan-950/60 to-indigo-950/60 border border-cyan-500/40 text-slate-100 rounded-br-sm shadow-cyan-500/5'
                   : 'bg-slate-900/90 border border-slate-800 text-slate-200 rounded-bl-sm'}"
               >
+                <!-- Quick Copy Button on Bubble Hover -->
+                <button
+                  type="button"
+                  on:click={() => copyMessageText(msg.content, msg.id)}
+                  class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 p-1 rounded-md bg-slate-950/80 hover:bg-slate-800 text-slate-400 hover:text-cyan-300 border border-slate-800 transition-all cursor-pointer"
+                  title="Copy message"
+                >
+                  {#if copiedMessageId === msg.id}
+                    <Check class="w-3 h-3 text-emerald-400" />
+                  {:else}
+                    <Copy class="w-3 h-3" />
+                  {/if}
+                </button>
+
                 <!-- Markdown Content -->
                 {#if msg.content}
                   <div class="prose prose-invert prose-xs max-w-none text-slate-200 leading-relaxed font-sans break-words markdown-body">
@@ -449,96 +679,123 @@
                         {files.length} Shared File(s)
                       </span>
                       {#if linkedTransfer}
-                        <span class="text-xs {linkedTransfer.status === 'completed' ? 'text-emerald-400 font-bold' : 'text-cyan-400'}">
-                          {linkedTransfer.status === 'completed' ? 'Verified' : `${linkedTransfer.status}`}
+                        <span class="text-[11px] font-semibold {linkedTransfer.status === 'completed'
+                          ? 'text-emerald-400'
+                          : linkedTransfer.status === 'in_progress'
+                          ? 'text-cyan-400 animate-pulse'
+                          : 'text-amber-400'}">
+                          {linkedTransfer.status === 'completed' ? 'Verified' : `${linkedTransfer.status.toUpperCase()}`}
                         </span>
                       {/if}
                     </div>
 
-                    <div class="space-y-1.5">
+                    <div class="space-y-2">
                       {#each files as f}
                         {@const badge = getFileTypeBadge(f.name)}
-                        <div class="flex items-center justify-between gap-2 p-2 rounded-xl bg-slate-950/80 border border-slate-800/90">
-                          <div class="flex items-center gap-2.5 min-w-0">
-                            <div class="w-7 h-7 rounded-lg {badge.color} border flex items-center justify-center font-mono font-bold text-[9px] shrink-0">
-                              {badge.label}
+                        {@const localPath = resolveLocalFilePath(f, isOutgoing, linkedTransfer)}
+                        {@const isImageFile = badge.isImage}
+
+                        <div class="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800/90 space-y-2">
+                          <!-- Direct In-Chat Image Preview -->
+                          {#if isImageFile && localPath}
+                            <!-- svelte-ignore a11y-click-events-have-key-events -->
+                            <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
+                            <div
+                              on:click={() => handleOpenFile(localPath)}
+                              class="rounded-lg overflow-hidden border border-slate-800/80 max-h-56 bg-slate-950 cursor-pointer hover:border-cyan-500/40 transition group/img relative"
+                              title="Click to view image"
+                            >
+                              <img
+                                src={convertFileSrc(localPath)}
+                                alt={f.name}
+                                class="w-full max-h-56 object-contain rounded-lg"
+                                on:error={(e) => {
+                                  // Fallback hide image element if unreadable or still downloading
+                                  e.currentTarget.style.display = 'none';
+                                }}
+                              />
                             </div>
-                            <div class="min-w-0">
-                              <p class="text-xs font-semibold text-white truncate max-w-[180px] sm:max-w-xs" title={f.name}>
-                                {f.name}
-                              </p>
-                              {#if f.size > 0}
-                                <p class="text-[10px] font-mono text-slate-400">{formatBytes(f.size)}</p>
+                          {/if}
+
+                          <div class="flex items-center justify-between gap-2">
+                            <div class="flex items-center gap-2.5 min-w-0">
+                              <div class="w-7 h-7 rounded-lg {badge.color} border flex items-center justify-center font-mono font-bold text-[9px] shrink-0">
+                                {badge.label}
+                              </div>
+                              <div class="min-w-0">
+                                <p class="text-xs font-semibold text-white truncate max-w-[170px] sm:max-w-xs" title={f.name}>
+                                  {f.name}
+                                </p>
+                                {#if f.size > 0}
+                                  <p class="text-[10px] font-mono text-slate-400">{formatBytes(f.size)}</p>
+                                {/if}
+                              </div>
+                            </div>
+
+                            <!-- Action Buttons on File Card -->
+                            <div class="flex items-center gap-1.5 shrink-0">
+                              {#if localPath}
+                                <button
+                                  type="button"
+                                  on:click={() => handleOpenFile(localPath)}
+                                  class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-[11px] text-slate-200 hover:text-white border border-slate-700 transition"
+                                  title="Open File Directly"
+                                >
+                                  Open
+                                </button>
+                                <button
+                                  type="button"
+                                  on:click={() => handleOpenFolder(localPath)}
+                                  class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-amber-300 border border-slate-700 transition"
+                                  title="Locate in Containing Folder"
+                                >
+                                  <FolderOpen class="w-3.5 h-3.5" />
+                                </button>
+                              {:else if linkedTransfer?.target_path}
+                                <button
+                                  type="button"
+                                  on:click={() => handleOpenFolder(linkedTransfer?.target_path || '')}
+                                  class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-[11px] text-slate-300 border border-slate-700 transition"
+                                  title="Open Destination Folder"
+                                >
+                                  Folder
+                                </button>
                               {/if}
                             </div>
-                          </div>
-
-                          <!-- Action Buttons on File Card -->
-                          <div class="flex items-center gap-1.5 shrink-0">
-                            {#if f.path}
-                              <button
-                                type="button"
-                                on:click={() => handleOpenFile(f.path)}
-                                class="px-2 py-0.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-[11px] text-slate-200 hover:text-white border border-slate-700 transition"
-                                title="Open File"
-                              >
-                                Open
-                              </button>
-                              <button
-                                type="button"
-                                on:click={() => handleOpenFolder(f.path)}
-                                class="p-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-amber-300 border border-slate-700 transition"
-                                title="Open Folder"
-                              >
-                                <FolderOpen class="w-3 h-3" />
-                              </button>
-                            {:else if linkedTransfer?.target_path}
-                              <button
-                                type="button"
-                                on:click={() => handleOpenFile(linkedTransfer.target_path || '')}
-                                class="px-2 py-0.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-[11px] text-slate-200 hover:text-white border border-slate-700 transition"
-                                title="Open File"
-                              >
-                                Open
-                              </button>
-                              <button
-                                type="button"
-                                on:click={() => handleOpenFolder(linkedTransfer.target_path || '')}
-                                class="p-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-amber-300 border border-slate-700 transition"
-                                title="Open Folder"
-                              >
-                                <FolderOpen class="w-3 h-3" />
-                              </button>
-                            {/if}
                           </div>
                         </div>
                       {/each}
                     </div>
 
-                    <!-- Live Transfer Progress in Chat Bubble -->
-                    {#if linkedTransfer && linkedTransfer.status === 'in_progress'}
+                    <!-- Live Transfer Progress in Chat Bubble (Reactive) -->
+                    {#if linkedTransfer && (linkedTransfer.status === 'in_progress' || (linkedTransfer.total_bytes > 0 && linkedTransfer.transferred_bytes < linkedTransfer.total_bytes))}
                       {@const pct = linkedTransfer.total_bytes > 0
                         ? Math.min(100, Math.round((linkedTransfer.transferred_bytes / linkedTransfer.total_bytes) * 100))
                         : 0}
-                      <div class="space-y-1 pt-1">
-                        <div class="w-full h-1.5 rounded-full bg-slate-950 overflow-hidden border border-slate-800">
+                      <div class="space-y-1 pt-1.5">
+                        <div class="w-full h-2 rounded-full bg-slate-950 overflow-hidden border border-slate-800">
                           <div
-                            class="h-full bg-gradient-to-r from-cyan-400 to-indigo-500 transition-all duration-150"
+                            class="h-full bg-gradient-to-r from-cyan-400 via-blue-500 to-indigo-500 transition-all duration-150"
                             style="width: {pct}%"
                           ></div>
                         </div>
                         <div class="flex items-center justify-between text-[10px] font-mono text-slate-400">
                           <span>{pct}% ({formatBytes(linkedTransfer.transferred_bytes)} / {formatBytes(linkedTransfer.total_bytes)})</span>
-                          <span class="text-cyan-400">{(linkedTransfer.speed_mbps || 0).toFixed(1)} MB/s</span>
+                          <span class="text-cyan-400 font-bold">{(linkedTransfer.speed_mbps || 0).toFixed(1)} MB/s</span>
                         </div>
                       </div>
                     {/if}
                   </div>
                 {/if}
 
-                <!-- Timestamp & Delivery Indicator -->
+                <!-- Timestamp & Delivery Indicator (Relative format) -->
                 <div class="flex items-center justify-end gap-1.5 mt-1.5 pt-1 text-[10px] font-mono text-slate-500">
-                  <span>{formatTime(msg.created_at)}</span>
+                  <span title={new Date(msg.created_at * 1000).toLocaleString()}>
+                    <!-- Reactive dependency on relativeTimeTicker -->
+                    {#key relativeTimeTicker}
+                      {formatRelativeTime(msg.created_at)}
+                    {/key}
+                  </span>
                   {#if isOutgoing}
                     <CheckCheck class="w-3 h-3 text-cyan-400" />
                   {/if}
@@ -548,6 +805,23 @@
           {/each}
         {/if}
       </div>
+
+      <!-- Blocked Peer Warning Banner -->
+      {#if isPeerBlocked}
+        <div class="p-3 bg-rose-950/60 border-t border-rose-800/80 flex items-center justify-between gap-3 text-xs text-rose-200">
+          <div class="flex items-center gap-2">
+            <ShieldAlert class="w-4 h-4 text-rose-400 shrink-0" />
+            <span>Kontak ini sedang diblokir. Pesan dan transfer file dari kontak ini tidak akan diterima.</span>
+          </div>
+          <button
+            type="button"
+            on:click={toggleBlockPeer}
+            class="px-3 py-1 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40 text-xs font-bold transition shrink-0"
+          >
+            Buka Blokir
+          </button>
+        </div>
+      {/if}
 
       <!-- Attachment Preview Pills -->
       {#if attachingFiles.length > 0}
@@ -569,47 +843,83 @@
         </div>
       {/if}
 
+      <!-- Emoticon Popover Picker -->
+      {#if showEmojiPicker && !isPeerBlocked}
+        <div class="p-3 border-t border-slate-800 bg-slate-950/95 max-h-48 overflow-y-auto space-y-2 backdrop-blur-md">
+          {#each emojiCategories as cat}
+            <div>
+              <p class="text-[10px] font-mono text-slate-500 mb-1">{cat.name}</p>
+              <div class="flex flex-wrap gap-1">
+                {#each cat.emojis as em}
+                  <button
+                    type="button"
+                    on:click={() => insertEmoji(em)}
+                    class="w-8 h-8 rounded-lg hover:bg-slate-800 flex items-center justify-center text-lg transition hover:scale-110"
+                  >
+                    {em}
+                  </button>
+                {/each}
+              </div>
+            </div>
+          {/each}
+        </div>
+      {/if}
+
       <!-- Chat Input Area -->
       <footer class="p-3.5 border-t border-slate-800/80 bg-slate-950/80 shrink-0">
         <form
           on:submit|preventDefault={handleSendMessage}
           class="flex items-end gap-2"
         >
-          <!-- Attachment Dropdown / Actions -->
+          <!-- Attachment Dropdown & Emoji Picker -->
           <div class="flex items-center gap-1 shrink-0 pb-1">
             <button
               type="button"
+              disabled={isPeerBlocked}
+              on:click={() => (showEmojiPicker = !showEmojiPicker)}
+              class="p-2 rounded-xl text-slate-400 hover:text-amber-300 hover:bg-slate-900 border border-transparent hover:border-slate-800 transition disabled:opacity-40"
+              title="Add Emoji"
+            >
+              <Smile class="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              disabled={isPeerBlocked}
               on:click={handlePickFiles}
-              class="p-2 rounded-xl text-slate-400 hover:text-cyan-300 hover:bg-slate-900 border border-transparent hover:border-slate-800 transition"
+              class="p-2 rounded-xl text-slate-400 hover:text-cyan-300 hover:bg-slate-900 border border-transparent hover:border-slate-800 transition disabled:opacity-40"
               title="Attach Multiple Files (Images, Videos, Code, PDFs, Docs, etc.)"
             >
               <Paperclip class="w-4 h-4" />
             </button>
             <button
               type="button"
+              disabled={isPeerBlocked}
               on:click={handlePickFolder}
-              class="p-2 rounded-xl text-slate-400 hover:text-cyan-300 hover:bg-slate-900 border border-transparent hover:border-slate-800 transition"
+              class="p-2 rounded-xl text-slate-400 hover:text-cyan-300 hover:bg-slate-900 border border-transparent hover:border-slate-800 transition disabled:opacity-40"
               title="Attach Entire Folder"
             >
               <FolderUp class="w-4 h-4" />
             </button>
           </div>
 
-          <!-- Input Textarea -->
+          <!-- Auto-expanding Input Textarea -->
           <div class="flex-1 relative">
             <textarea
+              bind:this={textareaEl}
               bind:value={messageInput}
+              on:input={autoResizeTextarea}
               on:keydown={handleKeyDown}
+              disabled={isPeerBlocked}
               rows="1"
-              placeholder="Type message, plans, code (Markdown supported)..."
-              class="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500/60 focus:ring-1 focus:ring-cyan-500/30 resize-none max-h-32 transition font-sans"
+              placeholder={isPeerBlocked ? "Kontak ini diblokir" : "Type message, plans, code (Markdown supported)..."}
+              class="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500/60 focus:ring-1 focus:ring-cyan-500/30 resize-none max-h-36 transition font-sans disabled:opacity-40"
             ></textarea>
           </div>
 
           <!-- Send Button -->
           <button
             type="submit"
-            disabled={isSending || (!messageInput.trim() && attachingFiles.length === 0)}
+            disabled={isSending || isPeerBlocked || (!messageInput.trim() && attachingFiles.length === 0)}
             class="px-4 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-xs shadow-lg shadow-cyan-500/20 transition-all flex items-center gap-1.5 shrink-0"
           >
             {#if isSending}
@@ -635,6 +945,14 @@
 </div>
 
 <style>
+  :global(.markdown-body a) {
+    color: #38bdf8 !important;
+    text-decoration: underline !important;
+    cursor: pointer !important;
+  }
+  :global(.markdown-body a:hover) {
+    color: #7dd3fc !important;
+  }
   :global(.markdown-body pre) {
     background-color: #020617 !important;
     border: 1px solid #1e293b;
@@ -684,4 +1002,3 @@
     background-color: rgba(15, 23, 42, 0.8);
   }
 </style>
-

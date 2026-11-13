@@ -258,6 +258,8 @@ export const raydropApi = {
     invoke<void>('clear_chat_messages', { peerDeviceId }),
   getUnreadChatCounts: () =>
     invoke<Record<string, number>>('get_unread_chat_counts'),
+  openExternalUrl: (url: string) =>
+    invoke<void>('open_external_url', { url }),
   listenEvent: <T>(event: string, handler: (payload: T) => void): Promise<UnlistenFn> =>
     listen<T>(event, (e) => handler(e.payload)),
 };

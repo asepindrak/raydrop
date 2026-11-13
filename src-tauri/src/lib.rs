@@ -287,6 +287,7 @@ pub fn run() {
             commands::mark_chat_messages_read,
             commands::clear_chat_messages,
             commands::get_unread_chat_counts,
+            commands::open_external_url,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Raydrop Tauri application");

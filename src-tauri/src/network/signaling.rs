@@ -240,6 +240,13 @@ async fn handle_signaling_message(app: &AppHandle, state: &Arc<AppState>, text: 
 
             // Real-time P2P Chat Packet Handler (Zero Server DB, E2EE Relay / Direct)
             if session_id.starts_with("chat:") {
+                if let Ok(Some(contact)) = state.db.get_contact(&from_device_id) {
+                    if contact.trust_level == "blocked" {
+                        warn!("Dropped chat packet from blocked peer: {from_device_id}");
+                        return;
+                    }
+                }
+
                 let bytes = match hex::decode(payload_json) {
                     Ok(b) => b,
                     Err(_) => return,

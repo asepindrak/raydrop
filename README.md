@@ -109,7 +109,7 @@ Pre-built binaries for **Windows (64-bit / x64)** are available on the [GitHub R
 | **Windows Installer** | `.msi` | **Recommended:** Installs desktop shortcuts, start menu entry, and Windows Explorer context menu integration. |
 | **Portable Executable** | `.exe` | Standalone portable binary that runs immediately without installation. |
 
-👉 **[Download the Latest Release (v1.1.4)](https://github.com/asepindrak/raydrop/releases/latest)**
+👉 **[Download the Latest Release (v1.1.5)](https://github.com/asepindrak/raydrop/releases/latest)**
 
 ---
 
