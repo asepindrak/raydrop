@@ -170,7 +170,7 @@
               id="setting-sig-url"
               type="text"
               bind:value={signalingUrl}
-              placeholder="wss://raydrop.gapleh.online/ws"
+              placeholder="wss://stun.raydrop.web.id/ws"
               class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono text-cyan-300 focus:outline-none focus:border-cyan-500"
             />
           </div>
@@ -185,7 +185,7 @@
               id="setting-stun-addr"
               type="text"
               bind:value={stunAddr}
-              placeholder="raydrop.gapleh.online:3478"
+              placeholder="stun.raydrop.web.id:3478"
               class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono text-cyan-300 focus:outline-none focus:border-cyan-500"
             />
           </div>
@@ -277,7 +277,7 @@
             <div class="flex items-center gap-2">
               <p class="text-xs font-semibold text-slate-200">Software Updates</p>
               <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
-                Current: v1.0.9
+                Current: v1.1.0
               </span>
             </div>
             <p class="text-[11px] text-slate-400 mt-0.5">

@@ -125,7 +125,7 @@ export interface TransferProgressEvent {
 }
 
 export function getApiBaseUrl(signalingUrl: string): string {
-  const trimmed = (signalingUrl || 'wss://raydrop.gapleh.online/ws').trim();
+  const trimmed = (signalingUrl || 'wss://stun.raydrop.web.id/ws').trim();
   return trimmed
     .replace(/^wss:\/\//i, 'https://')
     .replace(/^ws:\/\//i, 'http://')

@@ -1,4 +1,5 @@
 services:
+  # 1. Raydrop WAN Signaling & STUN Server (stun.raydrop.web.id)
   raydrop-signal:
     build:
       context: .
@@ -13,7 +14,7 @@ services:
     volumes:
       - raydrop_signal_data:/data
     ports:
-      # Direct UDP port for STUN / NAT Public IP:Port Discovery (bypasses HTTP proxy)
+      # Direct UDP port for STUN / NAT Public IP:Port Discovery
       - "3478:3478/udp"
     networks:
       - dokploy-network
@@ -23,16 +24,42 @@ services:
       # HTTP (Port 80) -> Auto Redirect to HTTPS
       - "traefik.http.middlewares.raydrop-https-redirect.redirectscheme.scheme=https"
       - "traefik.http.middlewares.raydrop-https-redirect.redirectscheme.permanent=true"
-      - "traefik.http.routers.raydrop-signal-web.rule=Host(`${SIGNAL_DOMAIN:-raydrop.gapleh.online}`)"
+      - "traefik.http.routers.raydrop-signal-web.rule=Host(`${SIGNAL_DOMAIN:-stun.raydrop.web.id}`)"
       - "traefik.http.routers.raydrop-signal-web.entrypoints=web"
       - "traefik.http.routers.raydrop-signal-web.middlewares=raydrop-https-redirect"
       # HTTPS & WSS (Port 443 via Let's Encrypt)
-      - "traefik.http.routers.raydrop-signal.rule=Host(`${SIGNAL_DOMAIN:-raydrop.gapleh.online}`)"
+      - "traefik.http.routers.raydrop-signal.rule=Host(`${SIGNAL_DOMAIN:-stun.raydrop.web.id}`)"
       - "traefik.http.routers.raydrop-signal.entrypoints=websecure"
       - "traefik.http.routers.raydrop-signal.tls=true"
       - "traefik.http.routers.raydrop-signal.tls.certresolver=letsencrypt"
       - "traefik.http.routers.raydrop-signal.service=raydrop-signal-svc"
       - "traefik.http.services.raydrop-signal-svc.loadbalancer.server.port=8080"
+
+  # 2. Raydrop Official Modern Download Landing Page (raydrop.web.id)
+  raydrop-landing:
+    build:
+      context: ../landing
+      dockerfile: Dockerfile
+    container_name: raydrop-landing
+    restart: unless-stopped
+    ports:
+      - "${LANDING_PORT:-3000}:80"
+    networks:
+      - dokploy-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=dokploy-network"
+      # HTTP (Port 80) -> Auto Redirect to HTTPS
+      - "traefik.http.routers.raydrop-landing-web.rule=Host(`${LANDING_DOMAIN:-raydrop.web.id}`)"
+      - "traefik.http.routers.raydrop-landing-web.entrypoints=web"
+      - "traefik.http.routers.raydrop-landing-web.middlewares=raydrop-https-redirect"
+      # HTTPS (Port 443 via Let's Encrypt)
+      - "traefik.http.routers.raydrop-landing.rule=Host(`${LANDING_DOMAIN:-raydrop.web.id}`)"
+      - "traefik.http.routers.raydrop-landing.entrypoints=websecure"
+      - "traefik.http.routers.raydrop-landing.tls=true"
+      - "traefik.http.routers.raydrop-landing.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.raydrop-landing.service=raydrop-landing-svc"
+      - "traefik.http.services.raydrop-landing-svc.loadbalancer.server.port=80"
 
 volumes:
   raydrop_signal_data:

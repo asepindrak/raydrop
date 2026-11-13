@@ -16,8 +16,8 @@ export const appSettings = writable<AppSettings>({
   discoverable: true,
   autostart: true,
   download_dir: '',
-  signaling_url: 'wss://raydrop.gapleh.online/ws',
-  stun_addr: 'raydrop.gapleh.online:3478',
+  signaling_url: 'wss://stun.raydrop.web.id/ws',
+  stun_addr: 'stun.raydrop.web.id:3478',
 });
 
 export const deviceCryptoMeta = writable<{

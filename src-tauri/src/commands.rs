@@ -276,10 +276,10 @@ pub fn update_settings(
             .trim_start_matches("http://")
             .split('/')
             .next()
-            .unwrap_or("raydrop.gapleh.online")
+            .unwrap_or("stun.raydrop.web.id")
             .split(':')
             .next()
-            .unwrap_or("raydrop.gapleh.online");
+            .unwrap_or("stun.raydrop.web.id");
         format!("{host}:3478")
     } else {
         stun_addr.trim().to_string()
