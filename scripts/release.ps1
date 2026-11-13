@@ -77,6 +77,7 @@ $readmePath = "$repoRoot/README.md"
 if (Test-Path $readmePath) {
     $rContent = Read-Utf8 $readmePath
     $rContent = $rContent -replace 'Latest Release \(v[\d\.]+\)', "Latest Release ($tag)"
+    $rContent = $rContent -replace 'download/v[\d\.]+/Raydrop_[\d\.]+', "download/$tag/Raydrop_${ver}"
     Write-Utf8NoBom $readmePath $rContent
 }
 

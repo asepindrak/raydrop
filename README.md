@@ -19,6 +19,12 @@
   <img src="https://img.shields.io/badge/privacy-Zero--Cloud--Storage-purple.svg" alt="Zero-Cloud Storage" />
 </p>
 
+<p align="center">
+  <a href="#-download"><img src="https://img.shields.io/badge/Windows-10%20%2F%2011%20(x64)-0078D6?style=flat-square&logo=windows&logoColor=white" alt="Windows 10/11" /></a>
+  <a href="#-download"><img src="https://img.shields.io/badge/macOS-Universal%20(M1--M4%20%2F%20Intel)-000000?style=flat-square&logo=apple&logoColor=white" alt="macOS Universal" /></a>
+  <a href="#-download"><img src="https://img.shields.io/badge/Linux-deb%20%7C%20AppImage-FCC624?style=flat-square&logo=linux&logoColor=black" alt="Linux deb | AppImage" /></a>
+</p>
+
 ---
 
 ## 🌟 Overview
@@ -102,13 +108,16 @@ The Raydrop signaling server (`signal-server/`) is hardened against unauthorized
 
 ## 📥 Download
 
-Pre-built binaries for **Windows (64-bit / x64)** are available on the [GitHub Releases](https://github.com/asepindrak/raydrop/releases):
+Pre-built native packages for **Windows**, **macOS**, and **Linux** are available on [GitHub Releases](https://github.com/asepindrak/raydrop/releases/latest) and the official live landing page at [raydrop.web.id](https://raydrop.web.id):
 
-| Package | Format | Description |
-| :--- | :---: | :--- |
-| **Windows Installer** | `.msi` | Official Windows installer with desktop shortcuts, system tray, and Windows Explorer context menu integration. |
+| Platform | Format | Architecture | Description | Download |
+| :--- | :---: | :---: | :--- | :---: |
+| **Windows** | `.msi` | x64 (64-bit) | Official Windows 10/11 installer with desktop shortcut, background tray, and Explorer context menu integration. | [Download MSI](https://github.com/asepindrak/raydrop/releases/download/v1.2.4/Raydrop_1.2.4_x64_en-US.msi) |
+| **macOS** | `.dmg` | Universal (Apple Silicon & Intel) | Drag-and-drop installer for macOS 11.0+. Native Universal binary supporting Apple Silicon (M1-M4) & Intel. | [Download DMG](https://github.com/asepindrak/raydrop/releases/download/v1.2.4/Raydrop_1.2.4_universal.dmg) |
+| **Linux (Debian / Ubuntu)** | `.deb` | x64 (amd64) | Debian, Ubuntu, and Linux Mint package with application menu integration and native WebKitGTK runtime. | [Download DEB](https://github.com/asepindrak/raydrop/releases/download/v1.2.4/Raydrop_1.2.4_amd64.deb) |
+| **Linux (Universal)** | `.AppImage` | x64 (amd64) | Standalone portable executable for Fedora, Arch Linux, openSUSE, and any standard Linux distribution. | [Download AppImage](https://github.com/asepindrak/raydrop/releases/download/v1.2.4/Raydrop_1.2.4_amd64.AppImage) |
 
-👉 **[Download the Latest Release (v1.2.4)](https://github.com/asepindrak/raydrop/releases/latest)**
+👉 **[View All Release Assets on GitHub Releases](https://github.com/asepindrak/raydrop/releases/latest)** &bull; **[Visit Raydrop Website (raydrop.web.id)](https://raydrop.web.id)**
 
 ---
 
