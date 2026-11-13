@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title id="pageTitle">Raydrop - Ultra-Fast & Secure P2P File Transfer (Zero Cloud Server)</title>
-  <meta name="description" id="pageDesc" content="Ultra-fast, zero-server peer-to-peer (P2P) file transfer system for Windows. Unlimited file size, end-to-end encrypted, zero cloud storage, free & open-source." />
+  <meta name="description" id="pageDesc" content="Ultra-fast, zero-server peer-to-peer (P2P) file transfer system for Windows, macOS, and Linux. Unlimited file size, end-to-end encrypted, zero cloud storage, free & open-source." />
   <link rel="icon" type="image/x-icon" href="/favicon.ico" />
   
   <!-- Fonts: Inter & Plus Jakarta Sans -->
@@ -727,14 +727,14 @@
     /* Download Section */
     .download-grid {
       display: grid;
-      grid-template-columns: minmax(0, 520px);
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
       justify-content: center;
       gap: 24px;
-      max-width: 840px;
+      max-width: 1060px;
       margin: 0 auto;
     }
     .dl-card {
-      padding: 36px 30px;
+      padding: 32px 26px;
       border-radius: var(--radius);
       background: var(--surface-card);
       border: 2px solid var(--line);
@@ -744,6 +744,22 @@
       gap: 20px;
       transition: transform 0.3s var(--ease-spring), border-color 0.3s, box-shadow 0.3s;
       position: relative;
+    }
+    .dl-os-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--surface-2);
+      color: var(--accent);
+      margin-bottom: 12px;
+    }
+    .dl-btn-group {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
     }
     .dl-card.featured {
       border-color: var(--accent);
@@ -925,7 +941,7 @@
               <polyline points="7 10 12 15 17 10"></polyline>
               <line x1="12" y1="15" x2="12" y2="3"></line>
             </svg>
-            <span id="heroDlText" data-i18n="hero_cta_dl">Download for Windows</span>
+            <span id="heroDlText" data-i18n="hero_cta_dl">Download Raydrop</span>
           </a>
 
           <a class="btn btn-ghost btn-large" href="https://github.com/asepindrak/raydrop" target="_blank" rel="noopener">
@@ -937,11 +953,11 @@
         </div>
 
         <p class="cta-meta">
-          <span>Windows 10/11 64-bit</span>
+          <span>Windows &bull; macOS &bull; Linux</span>
           <span>&bull;</span>
           <span data-i18n="hero_meta_mit">Free & Open Source (MIT)</span>
           <span>&bull;</span>
-          <span id="heroReleaseVer">v1.1.1</span>
+          <span id="heroReleaseVer">v1.2.4</span>
         </p>
       </div>
 
@@ -1137,17 +1153,22 @@
       <div class="container">
         <header class="section-head">
           <h2 data-i18n="dl_title">Download Raydrop</h2>
-          <p data-i18n="dl_desc">Choose your official Windows 10 & 11 (64-bit) package. Always free and open-source.</p>
+          <p data-i18n="dl_desc">Choose your operating system: Windows, macOS, or Linux. Always free and open-source.</p>
         </header>
 
         <div class="download-grid">
-          <!-- MSI Installer (Recommended) -->
-          <div class="dl-card featured">
-            <span class="dl-tag" data-i18n="dl_recommended">Recommended</span>
+          <!-- Windows Card -->
+          <div class="dl-card" id="cardWindows">
+            <span class="dl-tag" id="tagWindows" style="display:none;" data-i18n="dl_tag_detected">Detected OS</span>
             <div class="dl-head">
               <div>
-                <div class="dl-title">Windows Installer (.msi)</div>
-                <div class="dl-desc" data-i18n="dl_msi_desc">Permanent installation with automatic Explorer context menu & system tray.</div>
+                <div class="dl-os-icon">
+                  <svg width="24" height="24" viewBox="0 0 88 88" fill="currentColor">
+                    <path d="M0 12.402l35.688-4.86.016 34.423-35.67.24zM35.67 45.59l.034 34.455-35.67-4.89-.034-29.565zm7.306-38.995L88 0v41.523l-45.024.336zm45.024 38.647V88l-45.024-6.33-.016-36.425z"/>
+                  </svg>
+                </div>
+                <div class="dl-title">Windows</div>
+                <div class="dl-desc" data-i18n="dl_win_desc">Windows 10 & 11 (64-bit). MSI Installer with context menu and system tray.</div>
               </div>
             </div>
 
@@ -1157,12 +1178,77 @@
                 <polyline points="7 10 12 15 17 10"></polyline>
                 <line x1="12" y1="15" x2="12" y2="3"></line>
               </svg>
-              <span>Download Installer (.msi)</span>
+              <span>Download (.msi)</span>
             </a>
 
             <div class="dl-meta">
-              <span id="msiSize">Size: ~9.0 MB</span>
-              <span id="msiVersion">Version v1.1.1</span>
+              <span id="msiSize">Size: ~9.1 MB</span>
+              <span id="msiVersion">v1.2.4</span>
+            </div>
+          </div>
+
+          <!-- macOS Card -->
+          <div class="dl-card" id="cardMac">
+            <span class="dl-tag" id="tagMac" style="display:none;" data-i18n="dl_tag_detected">Detected OS</span>
+            <div class="dl-head">
+              <div>
+                <div class="dl-os-icon">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 6.37c.61-.75 1.04-1.8 1.01-2.87-.96.04-2.13.65-2.79 1.42-.58.67-1.1 1.74-1.01 2.8.04 0 .09.01.13.01.97 0 2.05-.61 2.66-1.36z"/>
+                  </svg>
+                </div>
+                <div class="dl-title">macOS</div>
+                <div class="dl-desc" data-i18n="dl_mac_desc">macOS 11.0+. Universal DMG for Apple Silicon (M1-M4) & Intel Macs.</div>
+              </div>
+            </div>
+
+            <a href="https://github.com/asepindrak/raydrop/releases/latest" id="dlDmgBtn" class="btn btn-primary btn-large">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+              </svg>
+              <span>Download (.dmg)</span>
+            </a>
+
+            <div class="dl-meta">
+              <span id="dmgSize">Size: ~12 MB</span>
+              <span id="dmgVersion">v1.2.4</span>
+            </div>
+          </div>
+
+          <!-- Linux Card -->
+          <div class="dl-card" id="cardLinux">
+            <span class="dl-tag" id="tagLinux" style="display:none;" data-i18n="dl_tag_detected">Detected OS</span>
+            <div class="dl-head">
+              <div>
+                <div class="dl-os-icon">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2C9.5 2 7.5 4 7.5 6.5c0 1.2.4 2.2 1.1 3-.7 1.1-1.1 2.4-1.1 3.8 0 1.2.4 2.3 1 3.2-.3.5-.5 1-.5 1.5 0 2.2 1.8 4 4 4s4-1.8 4-4c0-.5-.2-1-.5-1.5.6-.9 1-2 1-3.2 0-1.4-.4-2.7-1.1-3.8.7-.8 1.1-1.8 1.1-3C16.5 4 14.5 2 12 2z"/>
+                  </svg>
+                </div>
+                <div class="dl-title">Linux</div>
+                <div class="dl-desc" data-i18n="dl_linux_desc">Ubuntu, Debian, Fedora, Arch & distros. Lightweight native desktop client.</div>
+              </div>
+            </div>
+
+            <div class="dl-btn-group">
+              <a href="https://github.com/asepindrak/raydrop/releases/latest" id="dlDebBtn" class="btn btn-primary btn-large">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <polyline points="7 10 12 15 17 10"></polyline>
+                  <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+                <span>Download (.deb)</span>
+              </a>
+              <a href="https://github.com/asepindrak/raydrop/releases/latest" id="dlAppImageBtn" class="btn btn-ghost" style="justify-content: center; padding: 10px 16px; border: 1px solid var(--line); font-size: 13px;">
+                <span>Download (.AppImage)</span>
+              </a>
+            </div>
+
+            <div class="dl-meta">
+              <span id="linuxSize">Size: ~8.5 MB</span>
+              <span id="linuxVersion">v1.2.4</span>
             </div>
           </div>
         </div>
@@ -1272,10 +1358,12 @@
         card7_title: "Encrypted P2P Chat & Media Sharing",
         card7_desc: "Directly chat with contacts using rich Markdown and code formatting. Send photos, videos, documents, and multiple files right inside chat without any server database storage.",
         dl_title: "Download Raydrop",
-        dl_desc: "Choose your official Windows 10 & 11 (64-bit) package. Always free and open-source.",
+        dl_desc: "Available natively on Windows, macOS, and Linux. Always free and open-source.",
         dl_recommended: "Recommended",
-        dl_msi_desc: "Permanent installation with automatic Explorer context menu & system tray.",
-        dl_exe_desc: "Run immediately without installation. Great for USB drives or quick use on any PC.",
+        dl_tag_detected: "Detected OS",
+        dl_win_desc: "Windows 10 & 11 (64-bit). MSI Installer with context menu and system tray.",
+        dl_mac_desc: "macOS 11.0+. Universal DMG for Apple Silicon (M1-M4) & Intel Macs.",
+        dl_linux_desc: "Ubuntu, Debian, Fedora, Arch & distros. Lightweight native desktop client.",
         dl_older_prompt: "Looking for previous releases? ",
         dl_older_link: "View all releases on GitHub",
         footer_about: "Modern, zero-cloud peer-to-peer file transfer solution. End-to-end encrypted, lightning-fast for your daily workflow.",
@@ -1289,7 +1377,7 @@
       },
       id: {
         page_title: "Raydrop - Transfer File P2P Super Cepat & Aman (Zero Server)",
-        page_desc: "Aplikasi transfer file dan folder peer-to-peer (P2P) ultra cepat untuk Windows. Tanpa batas ukuran, tanpa upload ke cloud server, terenkripsi end-to-end, gratis dan open-source.",
+        page_desc: "Aplikasi transfer file dan folder peer-to-peer (P2P) ultra cepat untuk Windows, macOS, dan Linux. Tanpa batas ukuran, tanpa upload ke cloud server, terenkripsi end-to-end, gratis dan open-source.",
         nav_how: "Cara Kerja",
         nav_features: "Fitur",
         nav_download: "Unduh",
@@ -1300,7 +1388,7 @@
         hero_h1_part1: "Kirim. Terima.",
         hero_h1_gradient: "Tanpa Batas.",
         hero_lead: "Transfer file dan folder ukuran gigabyte hingga terabyte langsung antar komputer di jaringan lokal (LAN) maupun internet (WAN). Tanpa upload ke server cloud, tanpa antrean, 100% aman & terenkripsi.",
-        hero_cta_dl: "Unduh untuk Windows",
+        hero_cta_dl: "Unduh Raydrop",
         hero_cta_github: "Repository GitHub",
         hero_meta_mit: "Gratis & Open Source (MIT)",
         demo_title: "Raydrop - P2P Network (Aktif)",
@@ -1334,10 +1422,12 @@
         card7_title: "Chat P2P Terenkripsi & Kirim Media",
         card7_desc: "Kirim pesan langsung ke kontak dengan format Markdown dan kodingan. Kirim foto, video, dokumen, dan banyak file sekaligus langsung di dalam chat tanpa simpan database di server.",
         dl_title: "Unduh Raydrop",
-        dl_desc: "Pilih paket rilis resmi untuk Windows 10 & 11 (64-bit). Selalu gratis dan open-source.",
+        dl_desc: "Tersedia secara native untuk Windows, macOS, dan Linux. Selalu gratis dan open-source.",
         dl_recommended: "Disarankan",
-        dl_msi_desc: "Instalasi permanen dengan integrasi klik kanan Explorer & tray otomatis.",
-        dl_exe_desc: "Jalankan langsung tanpa perlu install. Cocok untuk flashdisk atau penggunaan cepat.",
+        dl_tag_detected: "OS Terdeteksi",
+        dl_win_desc: "Windows 10 & 11 (64-bit). Installer MSI dengan integrasi menu klik kanan dan system tray.",
+        dl_mac_desc: "macOS 11.0+. Universal DMG untuk Apple Silicon (M1-M4) dan Mac Intel.",
+        dl_linux_desc: "Ubuntu, Debian, Fedora, Arch & distro Linux. Aplikasi native ringan berbasis WebKitGTK.",
         dl_older_prompt: "Mencari rilis sebelumnya? ",
         dl_older_link: "Lihat semua rilis di GitHub",
         footer_about: "Solusi transfer file peer-to-peer modern, zero server cloud, aman terenkripsi, dan berkecepatan tinggi untuk kebutuhan kerja harian Anda.",
@@ -1430,27 +1520,90 @@
       demoSpeed.innerText = randomSpeed + ' MB/s';
     }, 1400);
 
-    // 5. Real-time GitHub Release Fetcher
+    // 5. Smart OS Detection & Real-time GitHub Release Fetcher
+    function detectUserOS() {
+      const ua = navigator.userAgent || '';
+      const platform = navigator.platform || '';
+      if (/Macintosh|MacIntel|MacPPC|Mac68K/i.test(platform) || /Mac OS X/i.test(ua)) return 'mac';
+      if (/Linux/i.test(platform) || (/Linux/i.test(ua) && !/Android/i.test(ua))) return 'linux';
+      return 'windows';
+    }
+
+    const userOS = detectUserOS();
+    if (userOS === 'mac') {
+      const card = document.getElementById('cardMac');
+      if (card) card.classList.add('featured');
+      const tag = document.getElementById('tagMac');
+      if (tag) tag.style.display = 'block';
+    } else if (userOS === 'linux') {
+      const card = document.getElementById('cardLinux');
+      if (card) card.classList.add('featured');
+      const tag = document.getElementById('tagLinux');
+      if (tag) tag.style.display = 'block';
+    } else {
+      const card = document.getElementById('cardWindows');
+      if (card) card.classList.add('featured');
+      const tag = document.getElementById('tagWindows');
+      if (tag) tag.style.display = 'block';
+    }
+
     async function fetchLatestRelease() {
       try {
         const res = await fetch('https://api.github.com/repos/asepindrak/raydrop/releases/latest');
         if (!res.ok) return;
         const data = await res.json();
-        currentTag = data.tag_name || 'v1.1.1';
+        currentTag = data.tag_name || 'v1.2.4';
         
         // Update texts
         document.getElementById('badgeText').innerText = translations[currentLang].badge_prefix + currentTag + translations[currentLang].badge_suffix;
         document.getElementById('heroReleaseVer').innerText = currentTag;
-        document.getElementById('msiVersion').innerText = (currentLang === 'id' ? 'Versi ' : 'Version ') + currentTag;
-        // Find assets
-        let msiAsset = data.assets.find(a => a.name.endsWith('.msi'));
+        const verLabel = (currentLang === 'id' ? 'Versi ' : 'Version ') + currentTag;
+        if (document.getElementById('msiVersion')) document.getElementById('msiVersion').innerText = verLabel;
+        if (document.getElementById('dmgVersion')) document.getElementById('dmgVersion').innerText = verLabel;
+        if (document.getElementById('linuxVersion')) document.getElementById('linuxVersion').innerText = verLabel;
+
+        // Assets
+        const msiAsset = data.assets.find(a => a.name.endsWith('.msi'));
+        const dmgAsset = data.assets.find(a => a.name.endsWith('.dmg'));
+        const debAsset = data.assets.find(a => a.name.endsWith('.deb'));
+        const appImageAsset = data.assets.find(a => a.name.endsWith('.AppImage'));
+
+        const sizePrefix = currentLang === 'id' ? 'Ukuran: ' : 'Size: ';
 
         if (msiAsset) {
-          const msiBtn = document.getElementById('dlMsiBtn');
-          msiBtn.href = msiAsset.browser_download_url;
-          document.getElementById('primaryHeroDlBtn').href = msiAsset.browser_download_url;
-          const msiMb = (msiAsset.size / (1024 * 1024)).toFixed(1);
-          document.getElementById('msiSize').innerText = (currentLang === 'id' ? 'Ukuran: ' : 'Size: ') + msiMb + ' MB';
+          document.getElementById('dlMsiBtn').href = msiAsset.browser_download_url;
+          const mb = (msiAsset.size / (1024 * 1024)).toFixed(1);
+          document.getElementById('msiSize').innerText = sizePrefix + mb + ' MB';
+        }
+
+        if (dmgAsset) {
+          document.getElementById('dlDmgBtn').href = dmgAsset.browser_download_url;
+          const mb = (dmgAsset.size / (1024 * 1024)).toFixed(1);
+          document.getElementById('dmgSize').innerText = sizePrefix + mb + ' MB';
+        }
+
+        if (debAsset) {
+          document.getElementById('dlDebBtn').href = debAsset.browser_download_url;
+          const mb = (debAsset.size / (1024 * 1024)).toFixed(1);
+          document.getElementById('linuxSize').innerText = sizePrefix + mb + ' MB (.deb)';
+        }
+
+        if (appImageAsset) {
+          document.getElementById('dlAppImageBtn').href = appImageAsset.browser_download_url;
+        }
+
+        // Hero CTA smart link to detected OS asset
+        const heroBtn = document.getElementById('primaryHeroDlBtn');
+        const heroText = document.getElementById('heroDlText');
+        if (userOS === 'mac' && dmgAsset) {
+          heroBtn.href = dmgAsset.browser_download_url;
+          heroText.innerText = (currentLang === 'id' ? 'Unduh untuk macOS (.dmg)' : 'Download for macOS (.dmg)');
+        } else if (userOS === 'linux' && (debAsset || appImageAsset)) {
+          heroBtn.href = debAsset ? debAsset.browser_download_url : appImageAsset.browser_download_url;
+          heroText.innerText = (currentLang === 'id' ? 'Unduh untuk Linux (.deb)' : 'Download for Linux (.deb)');
+        } else if (msiAsset) {
+          heroBtn.href = msiAsset.browser_download_url;
+          heroText.innerText = (currentLang === 'id' ? 'Unduh untuk Windows (.msi)' : 'Download for Windows (.msi)');
         }
       } catch (err) {
         console.warn('Failed to fetch latest GitHub release:', err);
