@@ -47,3 +47,4 @@ export const cliQueuedFiles = writable<string[]>([]);
 export const settingsModalOpen = writable<boolean>(false);
 export const authModalOpen = writable<boolean>(false);
 export const activeMainTab = writable<'transfers' | 'lan' | 'devices' | 'contacts'>('transfers');
+export const isDraggingFiles = writable<boolean>(false);

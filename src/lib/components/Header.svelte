@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { open } from '@tauri-apps/plugin-dialog';
   import {
     appSettings,
     networkInfo,
@@ -7,6 +8,7 @@
     cloudMyDevices,
     cloudContacts,
     activeMainTab,
+    cliQueuedFiles,
   } from '../stores/state';
   import { contacts, lanContacts } from '../stores/contacts';
   import { activeTransfers } from '../stores/transfers';
@@ -28,6 +30,7 @@
     Laptop,
     Users,
     Zap,
+    Plus,
   } from 'lucide-svelte';
 
   let copied = false;
@@ -236,6 +239,27 @@
         <span>Sign In</span>
       </button>
     {/if}
+
+    <!-- Send Files Quick Button -->
+    <button
+      type="button"
+      on:click={async () => {
+        try {
+          const picked = await open({ multiple: true, title: 'Select Files to Send via Raydrop' });
+          if (picked) {
+            const list = Array.isArray(picked) ? picked : [picked];
+            cliQueuedFiles.update((prev) => [...prev, ...list]);
+          }
+        } catch (e) {
+          console.warn('File picker canceled or error:', e);
+        }
+      }}
+      class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-white font-bold text-xs shadow-md shadow-cyan-500/20 transition-all hover:-translate-y-0.5 active:translate-y-0"
+      title="Select multiple files to send"
+    >
+      <Plus class="w-3.5 h-3.5 stroke-[2.5]" />
+      <span class="hidden sm:inline">Send Files</span>
+    </button>
 
     <!-- Settings Trigger Button -->
     <button

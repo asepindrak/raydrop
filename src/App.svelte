@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { getCurrentWindow, UserAttentionType } from '@tauri-apps/api/window';
+  import { getCurrentWebview } from '@tauri-apps/api/webview';
   import Header from './lib/components/Header.svelte';
   import ContactList from './lib/components/ContactList.svelte';
   import ActiveTransfers from './lib/components/ActiveTransfers.svelte';
@@ -8,6 +9,7 @@
   import TraySettings from './lib/components/TraySettings.svelte';
   import AuthModal from './lib/components/AuthModal.svelte';
   import UpdateModal from './lib/components/UpdateModal.svelte';
+  import { Upload } from 'lucide-svelte';
   import {
     appSettings,
     deviceCryptoMeta,
@@ -18,6 +20,7 @@
     cliQueuedFiles,
     authModalOpen,
     activeMainTab,
+    isDraggingFiles,
   } from './lib/stores/state';
   import { contacts } from './lib/stores/contacts';
   import {
@@ -176,6 +179,26 @@
       updateProgress.set(payload);
     });
 
+    // Native OS Drag and Drop multiple files/folders listener
+    try {
+      const webview = getCurrentWebview();
+      await webview.onDragDropEvent((event) => {
+        if (event.payload.type === 'enter' || event.payload.type === 'over') {
+          isDraggingFiles.set(true);
+        } else if (event.payload.type === 'drop') {
+          isDraggingFiles.set(false);
+          const droppedPaths = event.payload.paths;
+          if (droppedPaths && droppedPaths.length > 0) {
+            cliQueuedFiles.update((prev) => [...prev, ...droppedPaths]);
+          }
+        } else if (event.payload.type === 'leave') {
+          isDraggingFiles.set(false);
+        }
+      });
+    } catch (err) {
+      console.warn('Native Drag-Drop event setup error:', err);
+    }
+
     // Auto-check for software updates silently on startup after brief initialization
     setTimeout(() => {
       checkForUpdates(false).catch(() => {});
@@ -199,6 +222,24 @@
       <ContactList />
     {/if}
   </main>
+
+  <!-- Fullscreen Drag & Drop Overlay Indicator -->
+  {#if $isDraggingFiles}
+    <div class="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex flex-col items-center justify-center pointer-events-none transition-all">
+      <div class="p-8 rounded-3xl border-2 border-dashed border-cyan-400 bg-slate-900/95 shadow-2xl shadow-cyan-500/25 flex flex-col items-center text-center max-w-md mx-4 transform scale-105 transition-transform">
+        <div class="w-20 h-20 rounded-2xl bg-gradient-to-tr from-cyan-500/25 to-indigo-500/25 border border-cyan-400/50 flex items-center justify-center text-cyan-300 mb-4 animate-bounce">
+          <Upload class="w-10 h-10 stroke-[2.2]" />
+        </div>
+        <h3 class="text-xl font-extrabold text-white font-display">Drop Files to Transfer</h3>
+        <p class="text-xs text-slate-300 mt-2">
+          Drop any multiple files or folders here to send directly via encrypted P2P.
+        </p>
+        <div class="flex items-center gap-2 mt-4 text-[11px] font-mono text-cyan-400 bg-cyan-500/10 px-3 py-1.5 rounded-full border border-cyan-500/30">
+          <span>⚡ Unlimited Size • Resumable • Zero Cloud Storage</span>
+        </div>
+      </div>
+    </div>
+  {/if}
 
   <TransferModal />
   <TraySettings />
