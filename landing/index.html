@@ -92,7 +92,7 @@
         >
           <i data-lucide="github" class="w-4 h-4"></i>
           <span class="hidden sm:inline">Star on GitHub</span>
-          <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-cyan-400 border border-slate-700">v1.1.0</span>
+          <span id="nav-version" class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-cyan-400 border border-slate-700">v1.1.0</span>
         </a>
         <a
           href="#download"
@@ -112,9 +112,9 @@
       <!-- Release Pill Badge -->
       <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-cyan-950/60 border border-cyan-500/40 text-xs font-mono text-cyan-300 shadow-sm shadow-cyan-500/10 animate-in fade-in slide-in-from-top-4 duration-500">
         <span class="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
-        <span class="font-bold">Raydrop v1.1.0 Released</span>
+        <span id="hero-version-badge" class="font-bold">Raydrop v1.1.0 Released</span>
         <span class="text-slate-500">•</span>
-        <span class="text-slate-400">1-Click Win 11 Context Menu & Auto-Updater</span>
+        <span id="hero-version-note" class="text-slate-400">Direct P2P LAN/WAN Transfer</span>
       </div>
 
       <!-- Main Headline -->
@@ -133,15 +133,17 @@
       <!-- CTA Action Buttons -->
       <div class="flex flex-col sm:flex-row items-center justify-center gap-4 pt-2">
         <a
+          id="hero-btn-msi"
           href="https://github.com/asepindrak/raydrop/releases/download/v1.1.0/Raydrop_1.1.0_x64_en-US.msi"
           class="w-full sm:w-auto flex items-center justify-center gap-2 px-7 py-3.5 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-sm font-bold text-white shadow-xl shadow-cyan-500/25 active:scale-95 transition-all"
         >
           <i data-lucide="download" class="w-4 h-4"></i>
           <span>Download Installer (.msi)</span>
-          <span class="text-xs font-mono opacity-80 pl-1">(8.6 MB)</span>
+          <span id="hero-size-msi" class="text-xs font-mono opacity-80 pl-1">(8.6 MB)</span>
         </a>
 
         <a
+          id="hero-btn-exe"
           href="https://github.com/asepindrak/raydrop/releases/download/v1.1.0/Raydrop_1.1.0_x64-portable.exe"
           class="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700/80 hover:border-cyan-500/50 text-sm font-semibold text-slate-200 transition-all"
         >
@@ -540,7 +542,7 @@
             <span class="text-xs font-mono font-bold px-2.5 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
               Recommended
             </span>
-            <span class="text-xs font-mono text-slate-400">v1.1.0</span>
+            <span id="card-msi-version" class="text-xs font-mono text-slate-400">v1.1.0</span>
           </div>
 
           <div class="space-y-1">
@@ -549,11 +551,12 @@
           </div>
 
           <div class="space-y-1 font-mono text-[11px] text-slate-400">
-            <p>File: <span class="text-slate-300">Raydrop_1.1.0_x64_en-US.msi</span></p>
-            <p>Size: <span class="text-slate-300">8.64 MB</span></p>
+            <p>File: <span id="card-msi-filename" class="text-slate-300">Raydrop_1.1.0_x64_en-US.msi</span></p>
+            <p>Size: <span id="card-msi-filesize" class="text-slate-300">8.64 MB</span></p>
           </div>
 
           <a
+            id="card-msi-btn"
             href="https://github.com/asepindrak/raydrop/releases/download/v1.1.0/Raydrop_1.1.0_x64_en-US.msi"
             class="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-xs font-bold text-slate-950 transition-all shadow-lg shadow-cyan-500/20"
           >
@@ -568,7 +571,7 @@
             <span class="text-xs font-mono font-medium px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700">
               Standalone / Portable
             </span>
-            <span class="text-xs font-mono text-slate-400">v1.1.0</span>
+            <span id="card-exe-version" class="text-xs font-mono text-slate-400">v1.1.0</span>
           </div>
 
           <div class="space-y-1">
@@ -577,11 +580,12 @@
           </div>
 
           <div class="space-y-1 font-mono text-[11px] text-slate-400">
-            <p>File: <span class="text-slate-300">Raydrop_1.1.0_x64-portable.exe</span></p>
-            <p>Size: <span class="text-slate-300">Standalone Binary</span></p>
+            <p>File: <span id="card-exe-filename" class="text-slate-300">Raydrop_1.1.0_x64-portable.exe</span></p>
+            <p>Size: <span id="card-exe-filesize" class="text-slate-300">Standalone Binary</span></p>
           </div>
 
           <a
+            id="card-exe-btn"
             href="https://github.com/asepindrak/raydrop/releases/download/v1.1.0/Raydrop_1.1.0_x64-portable.exe"
             class="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-bold text-white transition-all"
           >
@@ -590,6 +594,20 @@
           </a>
         </div>
 
+      </div>
+
+      <!-- Real-time Release Notes Container -->
+      <div id="live-release-container" class="glass-card rounded-2xl p-6 text-left space-y-3">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+          <div class="flex items-center gap-2">
+            <i data-lucide="sparkles" class="w-4 h-4 text-cyan-400"></i>
+            <h4 id="live-release-title" class="text-sm font-bold text-white">What's New in Raydrop</h4>
+          </div>
+          <span id="live-release-date" class="text-xs font-mono text-cyan-400 font-semibold">Latest Release</span>
+        </div>
+        <div id="live-release-notes" class="text-xs font-mono text-slate-300 whitespace-pre-wrap max-h-56 overflow-y-auto leading-relaxed p-3.5 bg-slate-950/80 rounded-xl border border-slate-800/80 select-text">
+Fetching release notes from GitHub...
+        </div>
       </div>
 
       <p class="text-xs text-slate-500 font-mono">
@@ -621,6 +639,99 @@
       </p>
     </div>
   </footer>
+
+  <script>
+    // Initialize Lucide Icons
+    lucide.createIcons();
+
+    // Auto-Sync Latest Release Dynamically from GitHub Releases API
+    async function autoFetchLatestRelease() {
+      try {
+        const res = await fetch('https://api.github.com/repos/asepindrak/raydrop/releases/latest');
+        if (!res.ok) return;
+        const data = await res.json();
+        const tag = data.tag_name;
+        if (!tag) return;
+        const assets = data.assets || [];
+
+        const msi = assets.find(a => a.name.toLowerCase().endsWith('.msi'));
+        const exe = assets.find(a => a.name.toLowerCase().endsWith('.exe'));
+
+        function fmtBytes(bytes) {
+          if (!bytes) return '';
+          const mb = (bytes / (1024 * 1024)).toFixed(1);
+          return `${mb} MB`;
+        }
+
+        function fmtDate(iso) {
+          try {
+            return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+          } catch { return ''; }
+        }
+
+        // Update Navbar badge
+        const elNav = document.getElementById('nav-version');
+        if (elNav) elNav.textContent = tag;
+
+        // Update Hero Badge
+        const elHeroBadge = document.getElementById('hero-version-badge');
+        if (elHeroBadge) elHeroBadge.textContent = `Raydrop ${tag} Released`;
+
+        // Update Hero Download Buttons
+        if (msi) {
+          const elHeroMsi = document.getElementById('hero-btn-msi');
+          if (elHeroMsi) elHeroMsi.href = msi.browser_download_url;
+          const elHeroSize = document.getElementById('hero-size-msi');
+          if (elHeroSize) elHeroSize.textContent = `(${fmtBytes(msi.size)})`;
+        }
+        if (exe) {
+          const elHeroExe = document.getElementById('hero-btn-exe');
+          if (elHeroExe) elHeroExe.href = exe.browser_download_url;
+        }
+
+        // Update Download Center Cards
+        if (msi) {
+          const elCardMsiVer = document.getElementById('card-msi-version');
+          if (elCardMsiVer) elCardMsiVer.textContent = tag;
+          const elCardMsiFile = document.getElementById('card-msi-filename');
+          if (elCardMsiFile) elCardMsiFile.textContent = msi.name;
+          const elCardMsiSize = document.getElementById('card-msi-filesize');
+          if (elCardMsiSize) elCardMsiSize.textContent = fmtBytes(msi.size);
+          const elCardMsiBtn = document.getElementById('card-msi-btn');
+          if (elCardMsiBtn) elCardMsiBtn.href = msi.browser_download_url;
+        }
+
+        if (exe) {
+          const elCardExeVer = document.getElementById('card-exe-version');
+          if (elCardExeVer) elCardExeVer.textContent = tag;
+          const elCardExeFile = document.getElementById('card-exe-filename');
+          if (elCardExeFile) elCardExeFile.textContent = exe.name;
+          const elCardExeSize = document.getElementById('card-exe-filesize');
+          if (elCardExeSize) elCardExeSize.textContent = fmtBytes(exe.size) || 'Standalone Binary';
+          const elCardExeBtn = document.getElementById('card-exe-btn');
+          if (elCardExeBtn) elCardExeBtn.href = exe.browser_download_url;
+        }
+
+        // Update Live Release Notes
+        if (data.name) {
+          const elTitle = document.getElementById('live-release-title');
+          if (elTitle) elTitle.textContent = data.name;
+        }
+        if (data.published_at) {
+          const elDate = document.getElementById('live-release-date');
+          if (elDate) elDate.textContent = `Released on ${fmtDate(data.published_at)}`;
+        }
+        if (data.body) {
+          const elNotes = document.getElementById('live-release-notes');
+          if (elNotes) elNotes.textContent = data.body;
+        }
+      } catch (err) {
+        console.warn('Auto release fetch notice:', err);
+      }
+    }
+
+    autoFetchLatestRelease();
+  </script>
 
   <script>
     // Initialize Lucide Icons
