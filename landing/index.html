@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="id">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Raydrop - Transfer File P2P Super Cepat & Aman (Zero Server)</title>
-  <meta name="description" content="Aplikasi transfer file dan folder peer-to-peer (P2P) ultra cepat untuk Windows. Tanpa batas ukuran, tanpa upload ke cloud server, terenkripsi end-to-end, gratis dan open-source." />
+  <title id="pageTitle">Raydrop - Ultra-Fast & Secure P2P File Transfer (Zero Cloud Server)</title>
+  <meta name="description" id="pageDesc" content="Ultra-fast, zero-server peer-to-peer (P2P) file transfer system for Windows. Unlimited file size, end-to-end encrypted, zero cloud storage, free & open-source." />
   <link rel="icon" type="image/x-icon" href="/favicon.ico" />
   
   <!-- Fonts: Inter & Plus Jakarta Sans -->
@@ -228,6 +228,44 @@
       gap: 12px;
     }
 
+    /* Language Switcher Pill (Filee style) */
+    .lang-pill {
+      display: inline-flex;
+      align-items: center;
+      background: color-mix(in srgb, var(--surface) 80%, transparent);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 3px;
+      font-size: 13px;
+      font-weight: 600;
+      backdrop-filter: blur(10px);
+    }
+    .lang-opt {
+      padding: 5px 11px;
+      border-radius: 999px;
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      font-family: var(--font);
+      font-weight: 600;
+      font-size: 13px;
+      transition: all 0.2s ease;
+    }
+    .lang-opt:hover {
+      color: var(--ink);
+    }
+    .lang-opt.active {
+      background: var(--surface);
+      color: var(--accent-deep);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    }
+    @media (prefers-color-scheme: dark) {
+      .lang-opt.active {
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+      }
+    }
+
     /* Buttons */
     .btn {
       display: inline-flex;
@@ -389,7 +427,7 @@
       .cta-meta { justify-content: center; }
     }
 
-    /* Interactive Demo Card (Filee style app window) */
+    /* Interactive Demo Card */
     .demo-window {
       position: relative;
       border-radius: var(--radius);
@@ -536,7 +574,7 @@
     }
     .progress-bar {
       height: 100%;
-      width: 78%;
+      width: 82%;
       background: var(--accent-gradient);
       border-radius: 999px;
       transition: width 0.3s ease;
@@ -578,7 +616,7 @@
       line-height: 1.6;
     }
 
-    /* 3 Steps (Filee style) */
+    /* 3 Steps */
     .steps {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
@@ -628,7 +666,7 @@
       line-height: 1.6;
     }
 
-    /* Bento Grid (Filee style) */
+    /* Bento Grid */
     .bento {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
@@ -686,7 +724,7 @@
       line-height: 1.6;
     }
 
-    /* Download Section (Card Picker) */
+    /* Download Section */
     .download-grid {
       display: grid;
       grid-template-columns: repeat(2, 1fr);
@@ -830,15 +868,21 @@
       </a>
 
       <nav class="nav-links">
-        <a href="#how">Cara Kerja</a>
-        <a href="#features">Fitur</a>
-        <a href="#download">Unduh</a>
+        <a href="#how" data-i18n="nav_how">How it Works</a>
+        <a href="#features" data-i18n="nav_features">Features</a>
+        <a href="#download" data-i18n="nav_download">Download</a>
         <a href="https://github.com/asepindrak/raydrop" target="_blank" rel="noopener">GitHub</a>
       </nav>
 
       <div class="nav-actions">
+        <!-- Language Switcher (EN / ID) -->
+        <div class="lang-pill" aria-label="Select Language">
+          <button type="button" class="lang-opt active" id="langEnBtn" onclick="changeLanguage('en')">EN</button>
+          <button type="button" class="lang-opt" id="langIdBtn" onclick="changeLanguage('id')">ID</button>
+        </div>
+
         <!-- Theme Toggle -->
-        <button class="btn-icon" id="themeToggle" title="Ganti Mode Gelap/Terang" aria-label="Toggle theme">
+        <button class="btn-icon" id="themeToggle" title="Toggle Dark/Light Mode" aria-label="Toggle theme">
           <svg id="sunIcon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="12" cy="12" r="4"></circle>
             <path d="M12 2v2"></path><path d="M12 20v2"></path><path d="m4.93 4.93 1.41 1.41"></path><path d="m17.66 17.66 1.41 1.41"></path><path d="M2 12h2"></path><path d="M20 12h2"></path><path d="m6.34 17.66-1.41 1.41"></path><path d="m19.07 4.93-1.41 1.41"></path>
@@ -851,7 +895,7 @@
             <polyline points="7 10 12 15 17 10"></polyline>
             <line x1="12" y1="15" x2="12" y2="3"></line>
           </svg>
-          <span>Unduh Gratis</span>
+          <span data-i18n="nav_cta">Download Free</span>
         </a>
       </div>
     </div>
@@ -863,17 +907,17 @@
       <div class="hero-copy">
         <a class="badge" href="https://github.com/asepindrak/raydrop/releases/latest" target="_blank" rel="noopener">
           <span class="badge-dot"></span>
-          <span id="badgeText">Baru di v1.1.1: Direct Windows 11 Menu & Auto Update</span>
+          <span id="badgeText">New in v1.1.1: Direct Windows 11 Menu & Auto Update</span>
         </a>
 
         <h1 class="hero-title">
-          <span class="kicker">Aplikasi Transfer File P2P Tercepat & Teraman</span>
-          Kirim. Terima.<br />
-          <span class="gradient-word">Tanpa Batas.</span>
+          <span class="kicker" data-i18n="hero_kicker">Ultra-Fast & Secure P2P File Transfer</span>
+          <span data-i18n="hero_h1_part1">Send. Receive.</span><br />
+          <span class="gradient-word" data-i18n="hero_h1_gradient">Without Limits.</span>
         </h1>
 
-        <p class="lead">
-          Transfer file dan folder ukuran gigabyte hingga terabyte langsung antar komputer di jaringan lokal (LAN) maupun internet (WAN). Tanpa upload ke server cloud, tanpa antrean, 100% aman & terenkripsi.
+        <p class="lead" data-i18n="hero_lead">
+          Transfer gigabyte to terabyte files and folders directly between PCs on local network (LAN) or internet (WAN). Zero cloud uploads, no queues, 100% private & end-to-end encrypted.
         </p>
 
         <div class="cta">
@@ -883,42 +927,42 @@
               <polyline points="7 10 12 15 17 10"></polyline>
               <line x1="12" y1="15" x2="12" y2="3"></line>
             </svg>
-            <span id="heroDlText">Unduh untuk Windows</span>
+            <span id="heroDlText" data-i18n="hero_cta_dl">Download for Windows</span>
           </a>
 
           <a class="btn btn-ghost btn-large" href="https://github.com/asepindrak/raydrop" target="_blank" rel="noopener">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
               <path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"></path>
             </svg>
-            <span>GitHub Repository</span>
+            <span data-i18n="hero_cta_github">GitHub Repository</span>
           </a>
         </div>
 
         <p class="cta-meta">
           <span>Windows 10/11 64-bit</span>
           <span>•</span>
-          <span>Gratis & Open Source (MIT)</span>
+          <span data-i18n="hero_meta_mit">Free & Open Source (MIT)</span>
           <span>•</span>
           <span id="heroReleaseVer">v1.1.1</span>
         </p>
       </div>
 
       <!-- Interactive App Window Preview -->
-      <div class="demo-window" aria-label="Demo Raydrop">
+      <div class="demo-window" aria-label="Raydrop Live Demo Preview">
         <div class="demo-titlebar">
           <div class="demo-dots">
             <span></span><span></span><span></span>
           </div>
-          <span>Raydrop - P2P Network (Aktif)</span>
+          <span data-i18n="demo_title">Raydrop - P2P Network (Active)</span>
           <span style="display:flex; align-items:center; gap:6px;">
-            <span class="peer-indicator"></span> 2 Perangkat Terkoneksi
+            <span class="peer-indicator"></span> <span data-i18n="demo_peers_online">2 Devices Online</span>
           </span>
         </div>
 
         <div class="demo-body">
           <!-- Peers list -->
           <div>
-            <div class="demo-label" style="margin-bottom:8px;">Perangkat Di Sekitar (mDNS LAN)</div>
+            <div class="demo-label" style="margin-bottom:8px;" data-i18n="demo_nearby">Nearby Devices (mDNS LAN)</div>
             <div class="demo-peers">
               <div class="peer-card active">
                 <span class="peer-indicator"></span>
@@ -938,7 +982,7 @@
                 <div class="file-icon">SQL</div>
                 <div>
                   <div class="file-name">backup_production.sql</div>
-                  <div class="file-meta">590.4 MB • Mengirim ke Yoga-Laptop</div>
+                  <div class="file-meta" data-i18n="demo_file_meta">590.4 MB • Sending to Yoga-Laptop</div>
                 </div>
               </div>
               <div class="speed-badge" id="demoSpeed">76.5 MB/s</div>
@@ -950,7 +994,7 @@
             </div>
 
             <div class="transfer-stats">
-              <span id="demoPercent">82% selesai (484 MB / 590 MB)</span>
+              <span id="demoPercent">82% completed (484 MB / 590 MB)</span>
               <span class="security-badge">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                   <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
@@ -968,48 +1012,48 @@
               <line x1="12" y1="9" x2="12" y2="13"></line>
               <line x1="12" y1="17" x2="12.01" y2="17"></line>
             </svg>
-            <span>Transfer berlangsung langsung antar PC (P2P). Nol byte data dikirim ke cloud.</span>
+            <span data-i18n="demo_privacy_note">Direct peer-to-peer transfer. Zero bytes of file data pass through third-party servers.</span>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- Cara Kerja (3 Langkah) -->
+    <!-- How it Works (3 Steps) -->
     <section class="section" id="how">
       <div class="container">
         <header class="section-head">
-          <h2>Transfer file dalam 3 langkah mudah</h2>
-          <p>Tanpa ribet upload ke Google Drive, tanpa buat akun wajib, tanpa batas kecepatan.</p>
+          <h2 data-i18n="how_title">Transfer files in 3 simple steps</h2>
+          <p data-i18n="how_desc">No Google Drive upload limits, no mandatory sign-ups, no speed throttling.</p>
         </header>
 
         <ol class="steps">
           <li class="step">
             <span class="step-number">1</span>
-            <h3>Pilih File atau Klik Kanan</h3>
-            <p>Tarik & lepas file apa saja ke jendela Raydrop, atau langsung klik kanan file di Windows 11 File Explorer lalu pilih <b>Send with Raydrop</b>.</p>
+            <h3 data-i18n="step1_title">Select Files or Right-Click</h3>
+            <p data-i18n="step1_desc">Drag and drop any files into Raydrop, or directly right-click any file in Windows 11 File Explorer and select <b>Send with Raydrop</b>.</p>
           </li>
 
           <li class="step">
             <span class="step-number">2</span>
-            <h3>Pilih Komputer Tujuan</h3>
-            <p>Perangkat di jaringan Wi-Fi/LAN yang sama otomatis terdeteksi via mDNS. Untuk transfer jarak jauh (WAN), cukup masukkan kode perangkat tujuan.</p>
+            <h3 data-i18n="step2_title">Pick Target Computer</h3>
+            <p data-i18n="step2_desc">Devices on the same Wi-Fi or LAN are automatically discovered via mDNS. For remote transfers (WAN), simply enter the target device code.</p>
           </li>
 
           <li class="step">
             <span class="step-number">3</span>
-            <h3>Transfer Langsung Selesai</h3>
-            <p>Data dikirim secara paralel antar komputer dengan kecepatan maksimal kabel/WiFi Anda. Integritas file terverifikasi otomatis dengan BLAKE3.</p>
+            <h3 data-i18n="step3_title">Direct Instant Transfer</h3>
+            <p data-i18n="step3_desc">Files stream directly peer-to-peer at your maximum Wi-Fi or LAN cable bandwidth. File integrity is verified in real-time with BLAKE3.</p>
           </li>
         </ol>
       </div>
     </section>
 
-    <!-- Fitur Unggulan (Bento Grid) -->
+    <!-- Features Bento Grid -->
     <section class="section" id="features">
       <div class="container">
         <header class="section-head">
-          <h2>Dirancang untuk Kecepatan & Privasi</h2>
-          <p>Solusi transfer file modern yang mengutamakan keamanan dan kemudahan pakai.</p>
+          <h2 data-i18n="feat_title">Built for Speed & Privacy</h2>
+          <p data-i18n="feat_desc">Modern peer-to-peer file transfer engineered for security, speed, and simplicity.</p>
         </header>
 
         <ul class="bento">
@@ -1020,8 +1064,8 @@
                 <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
               </svg>
             </div>
-            <h3>Zero Cloud Storage & 100% Privasi</h3>
-            <p>File Anda tidak pernah disimpan, di-buffer, ataupun diunggah ke server cloud mana pun. Server hanya membantu pertukaran IP awal (STUN/Signaling).</p>
+            <h3 data-i18n="card1_title">Zero Cloud Storage & 100% Privacy</h3>
+            <p data-i18n="card1_desc">Your files are never stored, cached, or uploaded to any cloud server. The signaling server only assists initial peer connection via STUN/UDP.</p>
           </li>
 
           <li class="card">
@@ -1030,8 +1074,8 @@
                 <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
               </svg>
             </div>
-            <h3>Kecepatan Gigabit Maksimal</h3>
-            <p>Tidak ada throttling atau batasan kuota. Manfaatkan bandwidth penuh kabel LAN Gigabit (hingga 110+ MB/s) atau kecepatan Wi-Fi 6 Anda.</p>
+            <h3 data-i18n="card2_title">Maximum Gigabit Speed</h3>
+            <p data-i18n="card2_desc">No speed throttling or daily quotas. Maximize your full gigabit LAN cable bandwidth (up to 110+ MB/s) or high-speed Wi-Fi 6 network.</p>
           </li>
 
           <li class="card">
@@ -1040,8 +1084,8 @@
                 <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
               </svg>
             </div>
-            <h3>Verifikasi Integritas BLAKE3</h3>
-            <p>Setiap potongan file diverifikasi secara kriptografis menggunakan algoritma hashing ultra-cepat BLAKE3, menjamin file diterima 100% utuh tanpa korup.</p>
+            <h3 data-i18n="card3_title">Cryptographic BLAKE3 Verification</h3>
+            <p data-i18n="card3_desc">Every chunk is verified cryptographically using the ultra-fast BLAKE3 hashing algorithm, guaranteeing files arrive 100% intact without corruption.</p>
           </li>
 
           <li class="card">
@@ -1051,8 +1095,8 @@
                 <polyline points="12 6 12 12 16 14"></polyline>
               </svg>
             </div>
-            <h3>Resume Otomatis & Tahan Putus</h3>
-            <p>Koneksi sempat terputus atau laptop tertidur? Transfer akan melanjutkan otomatis dari potongan terakhir tanpa perlu mengulang dari 0%.</p>
+            <h3 data-i18n="card4_title">Auto-Resume & Fault Tolerant</h3>
+            <p data-i18n="card4_desc">Wi-Fi dropped or laptop went to sleep? Transfer automatically resumes from the last completed chunk without starting over from 0%.</p>
           </li>
 
           <li class="card">
@@ -1063,8 +1107,8 @@
                 <line x1="12" y1="17" x2="12" y2="21"></line>
               </svg>
             </div>
-            <h3>Windows 11 Direct Right-Click</h3>
-            <p>Integrasi menu konteks modern Windows 11. Cukup klik kanan biasa pada file mana pun tanpa perlu menekan tombol Shift.</p>
+            <h3 data-i18n="card5_title">Native Windows 11 Right-Click</h3>
+            <p data-i18n="card5_desc">Native Windows 11 context menu integration. Just right-click any file directly without needing to hold Shift or open extra menus.</p>
           </li>
 
           <li class="card">
@@ -1073,8 +1117,8 @@
                 <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path>
               </svg>
             </div>
-            <h3>Notifikasi & Auto Update 1-Klik</h3>
-            <p>Aplikasi otomatis mendeteksi ketika versi rilis baru tersedia di GitHub dan memungkinkan Anda mengunduh pembaruan langsung dari dalam aplikasi.</p>
+            <h3 data-i18n="card6_title">In-App 1-Click Auto Update</h3>
+            <p data-i18n="card6_desc">Automatically checks for new releases on GitHub and lets you upgrade directly from within the app with a single click.</p>
           </li>
         </ul>
       </div>
@@ -1084,18 +1128,18 @@
     <section class="section" id="download" style="background: color-mix(in srgb, var(--surface-2) 40%, transparent);">
       <div class="container">
         <header class="section-head">
-          <h2>Unduh Raydrop</h2>
-          <p>Pilih paket rilis resmi untuk Windows 10 & 11 (64-bit). Selalu gratis dan open-source.</p>
+          <h2 data-i18n="dl_title">Download Raydrop</h2>
+          <p data-i18n="dl_desc">Choose your official Windows 10 & 11 (64-bit) package. Always free and open-source.</p>
         </header>
 
         <div class="download-grid">
           <!-- MSI Installer (Recommended) -->
           <div class="dl-card featured">
-            <span class="dl-tag">Disarankan</span>
+            <span class="dl-tag" data-i18n="dl_recommended">Recommended</span>
             <div class="dl-head">
               <div>
                 <div class="dl-title">Windows Installer (.msi)</div>
-                <div class="dl-desc">Instalasi permanen dengan integrasi klik kanan Explorer & tray otomatis.</div>
+                <div class="dl-desc" data-i18n="dl_msi_desc">Permanent installation with automatic Explorer context menu & system tray.</div>
               </div>
             </div>
 
@@ -1109,8 +1153,8 @@
             </a>
 
             <div class="dl-meta">
-              <span id="msiSize">Ukuran: ~9.0 MB</span>
-              <span id="msiVersion">Versi v1.1.1</span>
+              <span id="msiSize">Size: ~9.0 MB</span>
+              <span id="msiVersion">Version v1.1.1</span>
             </div>
           </div>
 
@@ -1119,7 +1163,7 @@
             <div class="dl-head">
               <div>
                 <div class="dl-title">Windows Portable (.exe)</div>
-                <div class="dl-desc">Jalankan langsung tanpa perlu install. Cocok untuk flashdisk atau penggunaan cepat.</div>
+                <div class="dl-desc" data-i18n="dl_exe_desc">Run immediately without installation. Great for USB drives or quick use on any PC.</div>
               </div>
             </div>
 
@@ -1133,15 +1177,15 @@
             </a>
 
             <div class="dl-meta">
-              <span id="exeSize">Ukuran: ~24.4 MB</span>
-              <span id="exeVersion">Versi v1.1.1</span>
+              <span id="exeSize">Size: ~24.4 MB</span>
+              <span id="exeVersion">Version v1.1.1</span>
             </div>
           </div>
         </div>
 
         <div style="text-align: center; margin-top: 36px; font-size: 14px; color: var(--muted);">
-          <span>Mencari rilis sebelumnya? </span>
-          <a href="https://github.com/asepindrak/raydrop/releases" target="_blank" rel="noopener" style="text-decoration: underline; color: var(--accent);">Lihat semua rilis di GitHub</a>
+          <span data-i18n="dl_older_prompt">Looking for previous releases? </span>
+          <a href="https://github.com/asepindrak/raydrop/releases" target="_blank" rel="noopener" style="text-decoration: underline; color: var(--accent);" data-i18n="dl_older_link">View all releases on GitHub</a>
         </div>
       </div>
     </section>
@@ -1156,46 +1200,203 @@
             <img src="/logo.png" alt="Raydrop Logo" />
             <span>Raydrop</span>
           </a>
-          <p>
-            Solusi transfer file peer-to-peer modern, zero server cloud, aman terenkripsi, dan berkecepatan tinggi untuk kebutuhan kerja harian Anda.
+          <p data-i18n="footer_about">
+            Modern, zero-cloud peer-to-peer file transfer solution. End-to-end encrypted, lightning-fast for your daily workflow.
           </p>
         </div>
 
         <div class="footer-col">
-          <h4>Navigasi</h4>
+          <h4 data-i18n="footer_nav_title">Navigation</h4>
           <ul>
-            <li><a href="#how">Cara Kerja</a></li>
-            <li><a href="#features">Fitur Unggulan</a></li>
-            <li><a href="#download">Unduh Rilis</a></li>
+            <li><a href="#how" data-i18n="nav_how">How it Works</a></li>
+            <li><a href="#features" data-i18n="nav_features">Features</a></li>
+            <li><a href="#download" data-i18n="nav_download">Download</a></li>
             <li><a href="https://github.com/asepindrak/raydrop/releases" target="_blank" rel="noopener">Release Notes</a></li>
           </ul>
         </div>
 
         <div class="footer-col">
-          <h4>Open Source</h4>
+          <h4 data-i18n="footer_os_title">Open Source</h4>
           <ul>
-            <li><a href="https://github.com/asepindrak/raydrop" target="_blank" rel="noopener">Repository GitHub</a></li>
-            <li><a href="https://github.com/asepindrak/raydrop/issues" target="_blank" rel="noopener">Laporkan Kendala / Issue</a></li>
-            <li><a href="https://github.com/asepindrak/raydrop/blob/main/LICENSE" target="_blank" rel="noopener">Lisensi MIT</a></li>
+            <li><a href="https://github.com/asepindrak/raydrop" target="_blank" rel="noopener">GitHub Repository</a></li>
+            <li><a href="https://github.com/asepindrak/raydrop/issues" target="_blank" rel="noopener" data-i18n="footer_issues">Report an Issue</a></li>
+            <li><a href="https://github.com/asepindrak/raydrop/blob/main/LICENSE" target="_blank" rel="noopener" data-i18n="footer_license">MIT License</a></li>
           </ul>
         </div>
       </div>
 
       <div class="footer-bottom">
-        <div>© 2026 Raydrop. Dibuat dengan bangga sebagai proyek Open-Source berlisensi MIT.</div>
+        <div data-i18n="footer_copy">© 2026 Raydrop. Proudly open-source under the MIT License.</div>
         <div style="display:flex; align-items:center; gap:8px;">
-          <span>Status Signaling: </span>
+          <span data-i18n="footer_status_label">Signaling Server: </span>
           <span style="display:inline-flex; align-items:center; gap:5px; color: var(--green); font-weight:600;">
-            <span class="badge-dot" style="width:6px; height:6px;"></span> Aktif
+            <span class="badge-dot" style="width:6px; height:6px;"></span> <span data-i18n="footer_status_online">Active</span>
           </span>
         </div>
       </div>
     </div>
   </footer>
 
-  <!-- Script: Theme Toggle, Simulated Progress & Realtime GitHub Sync -->
+  <!-- Internationalization (EN / ID) + Theme & Realtime GitHub Sync -->
   <script>
-    // 1. Theme Management (System + Manual Toggle)
+    // 1. Translations Dictionary (Default: EN)
+    const translations = {
+      en: {
+        page_title: "Raydrop - Ultra-Fast & Secure P2P File Transfer (Zero Cloud Server)",
+        page_desc: "Ultra-fast, zero-server peer-to-peer (P2P) file transfer system for Windows. Unlimited file size, end-to-end encrypted, zero cloud storage, free & open-source.",
+        nav_how: "How it Works",
+        nav_features: "Features",
+        nav_download: "Download",
+        nav_cta: "Download Free",
+        badge_prefix: "New in ",
+        badge_suffix: ": Direct Windows 11 Menu & Auto Update",
+        hero_kicker: "Ultra-Fast & Secure P2P File Transfer",
+        hero_h1_part1: "Send. Receive.",
+        hero_h1_gradient: "Without Limits.",
+        hero_lead: "Transfer gigabyte to terabyte files and folders directly between PCs on local network (LAN) or internet (WAN). Zero cloud uploads, no queues, 100% private & end-to-end encrypted.",
+        hero_cta_dl: "Download for Windows",
+        hero_cta_github: "GitHub Repository",
+        hero_meta_mit: "Free & Open Source (MIT)",
+        demo_title: "Raydrop - P2P Network (Active)",
+        demo_peers_online: "2 Devices Online",
+        demo_nearby: "Nearby Devices (mDNS LAN)",
+        demo_file_meta: "590.4 MB • Sending to Yoga-Laptop",
+        demo_completed: "completed",
+        demo_privacy_note: "Direct peer-to-peer transfer. Zero bytes of file data pass through third-party servers.",
+        how_title: "Transfer files in 3 simple steps",
+        how_desc: "No Google Drive upload limits, no mandatory sign-ups, no speed throttling.",
+        step1_title: "Select Files or Right-Click",
+        step1_desc: "Drag and drop any files into Raydrop, or directly right-click any file in Windows 11 File Explorer and select <b>Send with Raydrop</b>.",
+        step2_title: "Pick Target Computer",
+        step2_desc: "Devices on the same Wi-Fi or LAN are automatically discovered via mDNS. For remote transfers (WAN), simply enter the target device code.",
+        step3_title: "Direct Instant Transfer",
+        step3_desc: "Files stream directly peer-to-peer at your maximum Wi-Fi or LAN cable bandwidth. File integrity is verified in real-time with BLAKE3.",
+        feat_title: "Built for Speed & Privacy",
+        feat_desc: "Modern peer-to-peer file transfer engineered for security, speed, and simplicity.",
+        card1_title: "Zero Cloud Storage & 100% Privacy",
+        card1_desc: "Your files are never stored, cached, or uploaded to any cloud server. The signaling server only assists initial peer connection via STUN/UDP.",
+        card2_title: "Maximum Gigabit Speed",
+        card2_desc: "No speed throttling or daily quotas. Maximize your full gigabit LAN cable bandwidth (up to 110+ MB/s) or high-speed Wi-Fi 6 network.",
+        card3_title: "Cryptographic BLAKE3 Verification",
+        card3_desc: "Every chunk is verified cryptographically using the ultra-fast BLAKE3 hashing algorithm, guaranteeing files arrive 100% intact without corruption.",
+        card4_title: "Auto-Resume & Fault Tolerant",
+        card4_desc: "Wi-Fi dropped or laptop went to sleep? Transfer automatically resumes from the last completed chunk without starting over from 0%.",
+        card5_title: "Native Windows 11 Right-Click",
+        card5_desc: "Native Windows 11 context menu integration. Just right-click any file directly without needing to hold Shift or open extra menus.",
+        card6_title: "In-App 1-Click Auto Update",
+        card6_desc: "Automatically checks for new releases on GitHub and lets you upgrade directly from within the app with a single click.",
+        dl_title: "Download Raydrop",
+        dl_desc: "Choose your official Windows 10 & 11 (64-bit) package. Always free and open-source.",
+        dl_recommended: "Recommended",
+        dl_msi_desc: "Permanent installation with automatic Explorer context menu & system tray.",
+        dl_exe_desc: "Run immediately without installation. Great for USB drives or quick use on any PC.",
+        dl_older_prompt: "Looking for previous releases? ",
+        dl_older_link: "View all releases on GitHub",
+        footer_about: "Modern, zero-cloud peer-to-peer file transfer solution. End-to-end encrypted, lightning-fast for your daily workflow.",
+        footer_nav_title: "Navigation",
+        footer_os_title: "Open Source",
+        footer_issues: "Report an Issue",
+        footer_license: "MIT License",
+        footer_copy: "© 2026 Raydrop. Proudly open-source under the MIT License.",
+        footer_status_label: "Signaling Server: ",
+        footer_status_online: "Active"
+      },
+      id: {
+        page_title: "Raydrop - Transfer File P2P Super Cepat & Aman (Zero Server)",
+        page_desc: "Aplikasi transfer file dan folder peer-to-peer (P2P) ultra cepat untuk Windows. Tanpa batas ukuran, tanpa upload ke cloud server, terenkripsi end-to-end, gratis dan open-source.",
+        nav_how: "Cara Kerja",
+        nav_features: "Fitur",
+        nav_download: "Unduh",
+        nav_cta: "Unduh Gratis",
+        badge_prefix: "Baru di ",
+        badge_suffix: ": Direct Windows 11 Menu & Auto Update",
+        hero_kicker: "Aplikasi Transfer File P2P Tercepat & Teraman",
+        hero_h1_part1: "Kirim. Terima.",
+        hero_h1_gradient: "Tanpa Batas.",
+        hero_lead: "Transfer file dan folder ukuran gigabyte hingga terabyte langsung antar komputer di jaringan lokal (LAN) maupun internet (WAN). Tanpa upload ke server cloud, tanpa antrean, 100% aman & terenkripsi.",
+        hero_cta_dl: "Unduh untuk Windows",
+        hero_cta_github: "Repository GitHub",
+        hero_meta_mit: "Gratis & Open Source (MIT)",
+        demo_title: "Raydrop - P2P Network (Aktif)",
+        demo_peers_online: "2 Perangkat Terkoneksi",
+        demo_nearby: "Perangkat Di Sekitar (mDNS LAN)",
+        demo_file_meta: "590.4 MB • Mengirim ke Yoga-Laptop",
+        demo_completed: "selesai",
+        demo_privacy_note: "Transfer berlangsung langsung antar PC (P2P). Nol byte data dikirim ke cloud.",
+        how_title: "Transfer file dalam 3 langkah mudah",
+        how_desc: "Tanpa ribet upload ke Google Drive, tanpa buat akun wajib, tanpa batas kecepatan.",
+        step1_title: "Pilih File atau Klik Kanan",
+        step1_desc: "Tarik & lepas file apa saja ke jendela Raydrop, atau langsung klik kanan file di Windows 11 File Explorer lalu pilih <b>Send with Raydrop</b>.",
+        step2_title: "Pilih Komputer Tujuan",
+        step2_desc: "Perangkat di jaringan Wi-Fi/LAN yang sama otomatis terdeteksi via mDNS. Untuk transfer jarak jauh (WAN), cukup masukkan kode perangkat tujuan.",
+        step3_title: "Transfer Langsung Selesai",
+        step3_desc: "Data dikirim secara paralel antar komputer dengan kecepatan maksimal kabel/WiFi Anda. Integritas file terverifikasi otomatis dengan BLAKE3.",
+        feat_title: "Dirancang untuk Kecepatan & Privasi",
+        feat_desc: "Solusi transfer file modern yang mengutamakan keamanan dan kemudahan pakai.",
+        card1_title: "Zero Cloud Storage & 100% Privasi",
+        card1_desc: "File Anda tidak pernah disimpan, di-buffer, ataupun diunggah ke server cloud mana pun. Server hanya membantu pertukaran IP awal (STUN/Signaling).",
+        card2_title: "Kecepatan Gigabit Maksimal",
+        card2_desc: "Tidak ada throttling atau batasan kuota. Manfaatkan bandwidth penuh kabel LAN Gigabit (hingga 110+ MB/s) atau kecepatan Wi-Fi 6 Anda.",
+        card3_title: "Verifikasi Integritas BLAKE3",
+        card3_desc: "Setiap potongan file diverifikasi secara kriptografis menggunakan algoritma hashing ultra-cepat BLAKE3, menjamin file diterima 100% utuh tanpa korup.",
+        card4_title: "Resume Otomatis & Tahan Putus",
+        card4_desc: "Koneksi sempat terputus atau laptop tertidur? Transfer akan melanjutkan otomatis dari potongan terakhir tanpa perlu mengulang dari 0%.",
+        card5_title: "Windows 11 Direct Right-Click",
+        card5_desc: "Integrasi menu konteks modern Windows 11. Cukup klik kanan biasa pada file mana pun tanpa perlu menekan tombol Shift.",
+        card6_title: "Notifikasi & Auto Update 1-Klik",
+        card6_desc: "Aplikasi otomatis mendeteksi ketika versi rilis baru tersedia di GitHub dan memungkinkan Anda mengunduh pembaruan langsung dari dalam aplikasi.",
+        dl_title: "Unduh Raydrop",
+        dl_desc: "Pilih paket rilis resmi untuk Windows 10 & 11 (64-bit). Selalu gratis dan open-source.",
+        dl_recommended: "Disarankan",
+        dl_msi_desc: "Instalasi permanen dengan integrasi klik kanan Explorer & tray otomatis.",
+        dl_exe_desc: "Jalankan langsung tanpa perlu install. Cocok untuk flashdisk atau penggunaan cepat.",
+        dl_older_prompt: "Mencari rilis sebelumnya? ",
+        dl_older_link: "Lihat semua rilis di GitHub",
+        footer_about: "Solusi transfer file peer-to-peer modern, zero server cloud, aman terenkripsi, dan berkecepatan tinggi untuk kebutuhan kerja harian Anda.",
+        footer_nav_title: "Navigasi",
+        footer_os_title: "Open Source",
+        footer_issues: "Laporkan Kendala",
+        footer_license: "Lisensi MIT",
+        footer_copy: "© 2026 Raydrop. Dibuat dengan bangga sebagai proyek Open-Source berlisensi MIT.",
+        footer_status_label: "Status Signaling: ",
+        footer_status_online: "Aktif"
+      }
+    };
+
+    let currentLang = 'en';
+    let currentTag = 'v1.1.1';
+
+    function changeLanguage(lang) {
+      if (!translations[lang]) return;
+      currentLang = lang;
+      localStorage.setItem('raydrop-lang', lang);
+      document.documentElement.lang = lang;
+
+      // Update active button state
+      document.getElementById('langEnBtn').classList.toggle('active', lang === 'en');
+      document.getElementById('langIdBtn').classList.toggle('active', lang === 'id');
+
+      // Update page title & meta
+      document.getElementById('pageTitle').innerText = translations[lang].page_title;
+      document.getElementById('pageDesc').setAttribute('content', translations[lang].page_desc);
+
+      // Update badge
+      document.getElementById('badgeText').innerText = translations[lang].badge_prefix + currentTag + translations[lang].badge_suffix;
+
+      // Update all data-i18n elements
+      document.querySelectorAll('[data-i18n]').forEach(el => {
+        const key = el.getAttribute('data-i18n');
+        if (translations[lang][key]) {
+          el.innerHTML = translations[lang][key];
+        }
+      });
+    }
+
+    // Initialize Language (Default to 'en')
+    const savedLang = localStorage.getItem('raydrop-lang') || 'en';
+    changeLanguage(savedLang);
+
+    // 2. Theme Management (System + Manual Toggle)
     const themeToggleBtn = document.getElementById('themeToggle');
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)');
     
@@ -1215,7 +1416,7 @@
       setTheme(next);
     });
 
-    // 2. Navbar Scroll Shadow Effect
+    // 3. Navbar Scroll Shadow Effect
     const navbar = document.getElementById('navbar');
     window.addEventListener('scroll', () => {
       if (window.scrollY > 20) {
@@ -1225,7 +1426,7 @@
       }
     }, { passive: true });
 
-    // 3. Simulated Dynamic Speed & Progress in Demo Box
+    // 4. Simulated Dynamic Speed & Progress in Demo Box
     const demoProgress = document.getElementById('demoProgress');
     const demoSpeed = document.getElementById('demoSpeed');
     const demoPercent = document.getElementById('demoPercent');
@@ -1235,24 +1436,25 @@
       if (currentPct > 100) currentPct = 40;
       demoProgress.style.width = currentPct + '%';
       const curMb = Math.round((currentPct / 100) * 590.4);
-      demoPercent.innerText = currentPct + '% selesai (' + curMb + ' MB / 590 MB)';
+      const completedWord = currentLang === 'id' ? 'selesai' : 'completed';
+      demoPercent.innerText = currentPct + '% ' + completedWord + ' (' + curMb + ' MB / 590 MB)';
       const randomSpeed = (72 + Math.random() * 12).toFixed(1);
       demoSpeed.innerText = randomSpeed + ' MB/s';
     }, 1400);
 
-    // 4. Real-time GitHub Release Fetcher
+    // 5. Real-time GitHub Release Fetcher
     async function fetchLatestRelease() {
       try {
         const res = await fetch('https://api.github.com/repos/asepindrak/raydrop/releases/latest');
         if (!res.ok) return;
         const data = await res.json();
-        const tag = data.tag_name || 'v1.1.1';
+        currentTag = data.tag_name || 'v1.1.1';
         
         // Update texts
-        document.getElementById('badgeText').innerText = 'Versi Terbaru ' + tag + ': Direct Windows 11 Menu & Auto Update';
-        document.getElementById('heroReleaseVer').innerText = tag;
-        document.getElementById('msiVersion').innerText = 'Versi ' + tag;
-        document.getElementById('exeVersion').innerText = 'Versi ' + tag;
+        document.getElementById('badgeText').innerText = translations[currentLang].badge_prefix + currentTag + translations[currentLang].badge_suffix;
+        document.getElementById('heroReleaseVer').innerText = currentTag;
+        document.getElementById('msiVersion').innerText = (currentLang === 'id' ? 'Versi ' : 'Version ') + currentTag;
+        document.getElementById('exeVersion').innerText = (currentLang === 'id' ? 'Versi ' : 'Version ') + currentTag;
 
         // Find assets
         let msiAsset = data.assets.find(a => a.name.endsWith('.msi'));
@@ -1263,17 +1465,17 @@
           msiBtn.href = msiAsset.browser_download_url;
           document.getElementById('primaryHeroDlBtn').href = msiAsset.browser_download_url;
           const msiMb = (msiAsset.size / (1024 * 1024)).toFixed(1);
-          document.getElementById('msiSize').innerText = 'Ukuran: ' + msiMb + ' MB';
+          document.getElementById('msiSize').innerText = (currentLang === 'id' ? 'Ukuran: ' : 'Size: ') + msiMb + ' MB';
         }
 
         if (exeAsset) {
           const exeBtn = document.getElementById('dlExeBtn');
           exeBtn.href = exeAsset.browser_download_url;
           const exeMb = (exeAsset.size / (1024 * 1024)).toFixed(1);
-          document.getElementById('exeSize').innerText = 'Ukuran: ' + exeMb + ' MB';
+          document.getElementById('exeSize').innerText = (currentLang === 'id' ? 'Ukuran: ' : 'Size: ') + exeMb + ' MB';
         }
       } catch (err) {
-        console.warn('Gagal memuat rilis GitHub terbaru:', err);
+        console.warn('Failed to fetch latest GitHub release:', err);
       }
     }
 
