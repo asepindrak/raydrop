@@ -105,6 +105,7 @@ export interface TransferRecord {
   transferred_bytes: number;
   status: 'in_progress' | 'paused' | 'completed' | 'cancelled' | 'failed' | 'rejected';
   target_path: string | null;
+  source_paths?: string | null;
   created_at: number;
   speed_mbps?: number;
   eta_seconds?: number;
@@ -171,6 +172,10 @@ export const raydropApi = {
   ) => invoke<void>('update_contact_trust', { deviceId, trustLevel, userEmail }),
   initiateTransfer: (targetDeviceId: string, filePaths: string[]) =>
     invoke<string>('initiate_transfer', { targetDeviceId, filePaths }),
+  resumeTransfer: (sessionId: string) =>
+    invoke<string>('resume_transfer', { sessionId }),
+  pauseTransfer: (sessionId: string) =>
+    invoke<void>('pause_transfer', { sessionId }),
   respondTransferRequest: (
     sessionId: string,
     accepted: boolean,

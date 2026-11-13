@@ -36,6 +36,7 @@ pub struct TransferRecord {
     pub transferred_bytes: u64,
     pub status: String, // "in_progress", "paused", "completed", "cancelled", "failed", "rejected"
     pub target_path: Option<String>,
+    pub source_paths: Option<String>,
     pub created_at: u64,
 }
 
@@ -116,12 +117,18 @@ impl Database {
         )
         .map_err(|e| e.to_string())?;
 
-        // Migrate existing contacts table if needed (add new columns gracefully)
+        // Migrate existing contacts & transfer_history tables if needed
         let _ = conn.execute("ALTER TABLE contacts ADD COLUMN user_email TEXT", []);
         let _ = conn.execute("ALTER TABLE contacts ADD COLUMN user_name TEXT", []);
         let _ = conn.execute("ALTER TABLE contacts ADD COLUMN os_type TEXT", []);
         let _ = conn.execute(
             "ALTER TABLE contacts ADD COLUMN is_own_device INTEGER DEFAULT 0",
+            [],
+        );
+        let _ = conn.execute("ALTER TABLE transfer_history ADD COLUMN source_paths TEXT", []);
+        // Any transfer left in 'in_progress' from a previous PC shutdown/crash becomes 'paused' (resumable)
+        let _ = conn.execute(
+            "UPDATE transfer_history SET status = 'paused' WHERE status = 'in_progress'",
             [],
         );
 
@@ -412,12 +419,14 @@ impl Database {
         conn.execute(
             "INSERT INTO transfer_history (
                 id, peer_device_id, peer_alias, direction, network_route,
-                total_files, total_bytes, transferred_bytes, status, target_path, created_at
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
+                total_files, total_bytes, transferred_bytes, status, target_path, source_paths, created_at
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
             ON CONFLICT(id) DO UPDATE SET
-                transferred_bytes = excluded.transferred_bytes,
+                transferred_bytes = MAX(excluded.transferred_bytes, transfer_history.transferred_bytes),
                 status = excluded.status,
-                target_path = COALESCE(excluded.target_path, transfer_history.target_path)",
+                network_route = excluded.network_route,
+                target_path = COALESCE(excluded.target_path, transfer_history.target_path),
+                source_paths = COALESCE(excluded.source_paths, transfer_history.source_paths)",
             params![
                 t.id,
                 t.peer_device_id,
@@ -429,6 +438,7 @@ impl Database {
                 t.transferred_bytes as i64,
                 t.status,
                 t.target_path,
+                t.source_paths,
                 t.created_at as i64,
             ],
         )
@@ -436,12 +446,40 @@ impl Database {
         Ok(())
     }
 
+    pub fn get_transfer(&self, id: &str) -> Result<Option<TransferRecord>, String> {
+        let conn = self.conn.lock().map_err(|e| e.to_string())?;
+        conn.query_row(
+            "SELECT id, peer_device_id, peer_alias, direction, network_route,
+                    total_files, total_bytes, transferred_bytes, status, target_path, source_paths, created_at
+             FROM transfer_history WHERE id = ?1",
+            params![id],
+            |row| {
+                Ok(TransferRecord {
+                    id: row.get(0)?,
+                    peer_device_id: row.get(1)?,
+                    peer_alias: row.get(2)?,
+                    direction: row.get(3)?,
+                    network_route: row.get(4)?,
+                    total_files: row.get::<_, i64>(5)? as usize,
+                    total_bytes: row.get::<_, i64>(6)? as u64,
+                    transferred_bytes: row.get::<_, i64>(7)? as u64,
+                    status: row.get(8)?,
+                    target_path: row.get(9)?,
+                    source_paths: row.get(10)?,
+                    created_at: row.get::<_, i64>(11)? as u64,
+                })
+            },
+        )
+        .optional()
+        .map_err(|e| e.to_string())
+    }
+
     pub fn list_transfers(&self) -> Result<Vec<TransferRecord>, String> {
         let conn = self.conn.lock().map_err(|e| e.to_string())?;
         let mut stmt = conn
             .prepare(
                 "SELECT id, peer_device_id, peer_alias, direction, network_route,
-                        total_files, total_bytes, transferred_bytes, status, target_path, created_at
+                        total_files, total_bytes, transferred_bytes, status, target_path, source_paths, created_at
                  FROM transfer_history ORDER BY created_at DESC LIMIT 100",
             )
             .map_err(|e| e.to_string())?;
@@ -459,7 +497,8 @@ impl Database {
                     transferred_bytes: row.get::<_, i64>(7)? as u64,
                     status: row.get(8)?,
                     target_path: row.get(9)?,
-                    created_at: row.get::<_, i64>(10)? as u64,
+                    source_paths: row.get(10)?,
+                    created_at: row.get::<_, i64>(11)? as u64,
                 })
             })
             .map_err(|e| e.to_string())?;

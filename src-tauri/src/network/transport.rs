@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::path::{Component, Path, PathBuf};
 use std::sync::{
-    atomic::{AtomicBool, Ordering},
+    atomic::{AtomicBool, AtomicU64, Ordering},
     Arc,
 };
 use std::time::{Duration, Instant, UNIX_EPOCH};
@@ -24,6 +24,44 @@ use walkdir::WalkDir;
 const CHUNK_SIZE: usize = 512 * 1024; // 512 KB plaintext per frame
 const HEADER_LEN: usize = 36;
 const MAGIC_BYTES: &[u8; 4] = b"RAYD";
+const PARALLEL_WORKERS: usize = 6; // IDM-style 6 parallel chunk workers for large files
+const PARALLEL_THRESHOLD_BYTES: u64 = 4 * 1024 * 1024; // 4 MB threshold for parallel multi-segment streaming
+
+/// Forcefully pops up and focuses the main Raydrop window on the Win32 main UI thread,
+/// even if the app was minimized in the System Tray or behind another foreground application.
+pub fn popup_and_focus_main_window(app: &AppHandle) {
+    let app_handle = app.clone();
+    let _ = app.run_on_main_thread(move || {
+        if let Some(w) = app_handle.get_webview_window("main") {
+            let _ = w.set_always_on_top(true);
+            let _ = w.show();
+            let _ = w.unminimize();
+            let _ = w.set_focus();
+            let _ = w.request_user_attention(Some(tauri::UserAttentionType::Critical));
+            let w_clone = w.clone();
+            tauri::async_runtime::spawn(async move {
+                tokio::time::sleep(Duration::from_millis(1800)).await;
+                let _ = w_clone.set_always_on_top(false);
+                let _ = w_clone.set_focus();
+            });
+        }
+    });
+}
+
+/// Computes the full BLAKE3 digest of a file on disk asynchronously.
+async fn compute_file_blake3(path: &Path) -> Result<String, String> {
+    let mut file = File::open(path).await.map_err(|e| e.to_string())?;
+    let mut hasher = blake3::Hasher::new();
+    let mut buf = vec![0u8; 1024 * 1024];
+    loop {
+        let n = file.read(&mut buf).await.map_err(|e| e.to_string())?;
+        if n == 0 {
+            break;
+        }
+        hasher.update(&buf[..n]);
+    }
+    Ok(hasher.finalize().to_hex().to_string())
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 struct HelloFrame {
@@ -517,14 +555,35 @@ where
         return Err("Expected MANIFEST frame".to_string());
     }
 
-    // Determine Acceptance (Auto-accept for trusted_auto_accept, otherwise prompt UI Modal)
+    // Determine Acceptance:
+    // 1. If this session_id was already accepted earlier (resuming after Wi-Fi drop or PC restart), auto-resume into saved target_path!
+    // 2. If peer is trusted_auto_accept (or own device), auto-accept into default_dl!
+    // 3. Otherwise, pop up main window to the foreground and prompt the user via IncomingTransferEvent modal!
     let default_dl = state.settings.lock().unwrap().download_dir.clone();
-    let decision = if trust_level == "trusted_auto_accept" {
-        if let Some(w) = app.get_webview_window("main") {
-            let _ = w.show();
-            let _ = w.unminimize();
-            let _ = w.set_focus();
+    let existing_session_dir = state
+        .db
+        .get_transfer(&hello.session_id)
+        .ok()
+        .flatten()
+        .and_then(|t| {
+            if t.status != "rejected" && t.status != "cancelled" {
+                t.target_path
+            } else {
+                None
+            }
+        });
+
+    let decision = if let Some(saved_dir) = existing_session_dir {
+        info!(
+            "Auto-resuming previously accepted transfer session {} into {}",
+            hello.session_id, saved_dir
+        );
+        IncomingRequestDecision {
+            accepted: true,
+            target_directory: Some(saved_dir),
         }
+    } else if trust_level == "trusted_auto_accept" {
+        popup_and_focus_main_window(&app);
         IncomingRequestDecision {
             accepted: true,
             target_directory: Some(default_dl.clone()),
@@ -546,11 +605,7 @@ where
             total_size_bytes: manifest.total_size_bytes,
             files: manifest.files.clone(),
         };
-        if let Some(w) = app.get_webview_window("main") {
-            let _ = w.show();
-            let _ = w.unminimize();
-            let _ = w.set_focus();
-        }
+        popup_and_focus_main_window(&app);
         let _ = app.emit("incoming_transfer_request", &evt);
 
         match tokio::time::timeout(Duration::from_secs(120), rx).await {
@@ -589,6 +644,7 @@ where
             transferred_bytes: 0,
             status: "rejected".to_string(),
             target_path: None,
+            source_paths: None,
             created_at: now_unix_secs(),
         };
         let _ = state.db.upsert_transfer(&record);
@@ -599,9 +655,9 @@ where
     let target_root = PathBuf::from(decision.target_directory.unwrap_or(default_dl));
     std::fs::create_dir_all(&target_root).map_err(|e| e.to_string())?;
 
-    // Check existing `.raypart` files for resume offset calculation
+    // Check existing `.raypart` or completed files for instant O(1) resume offset calculation
     let mut resume_offsets = Vec::new();
-    let mut file_map: HashMap<u32, (PathBuf, PathBuf, u64, blake3::Hasher)> = HashMap::new();
+    let mut file_map: HashMap<u32, (PathBuf, PathBuf, u64)> = HashMap::new();
     let mut already_received_bytes: u64 = 0;
 
     for f in &manifest.files {
@@ -619,18 +675,39 @@ where
         );
         let part_path = final_path.with_file_name(part_name);
 
-        let mut hasher = blake3::Hasher::new();
         let mut offset_bytes = 0u64;
 
         if part_path.exists() {
             if let Ok(meta) = std::fs::metadata(&part_path) {
                 let existing_len = meta.len();
-                if existing_len > 0 && existing_len < f.size_bytes {
-                    if let Ok(existing_bytes) = std::fs::read(&part_path) {
-                        hasher.update(&existing_bytes);
-                        offset_bytes = existing_len;
-                        already_received_bytes += existing_len;
+                if existing_len > 0 && existing_len <= f.size_bytes {
+                    // Roll back by up to (PARALLEL_WORKERS * CHUNK_SIZE) aligned to CHUNK_SIZE
+                    // so any in-flight parallel tail chunks from an interrupted session are cleanly overwritten
+                    let safety_margin = (PARALLEL_WORKERS as u64) * (CHUNK_SIZE as u64);
+                    let safe_offset = if f.size_bytes >= PARALLEL_THRESHOLD_BYTES {
+                        if existing_len > safety_margin {
+                            ((existing_len - safety_margin) / (CHUNK_SIZE as u64))
+                                * (CHUNK_SIZE as u64)
+                        } else {
+                            0
+                        }
+                    } else {
+                        existing_len.min(f.size_bytes.saturating_sub(1))
+                    };
+
+                    if safe_offset > 0 {
+                        if let Ok(f_handle) =
+                            std::fs::OpenOptions::new().write(true).open(&part_path)
+                        {
+                            let _ = f_handle.set_len(safe_offset);
+                        }
+                        offset_bytes = safe_offset;
+                        already_received_bytes += safe_offset;
+                    } else {
+                        let _ = std::fs::remove_file(&part_path);
                     }
+                } else {
+                    let _ = std::fs::remove_file(&part_path);
                 }
             }
         }
@@ -639,7 +716,7 @@ where
             file_id: f.file_id,
             offset_bytes,
         });
-        file_map.insert(f.file_id, (part_path, final_path, offset_bytes, hasher));
+        file_map.insert(f.file_id, (part_path, final_path, offset_bytes));
     }
 
     let accept_resp = HandshakeResponseFrame {
@@ -668,6 +745,7 @@ where
         transferred_bytes: already_received_bytes,
         status: "in_progress".to_string(),
         target_path: Some(target_root.to_string_lossy().to_string()),
+        source_paths: None,
         created_at: now_unix_secs(),
     };
     let _ = state.db.upsert_transfer(&record);
@@ -675,23 +753,43 @@ where
 
     let start_time = Instant::now();
     let mut last_emit = Instant::now();
+    let mut last_db_sync = Instant::now();
     let mut completed_files = 0usize;
     let mut open_handles: HashMap<u32, File> = HashMap::new();
 
-    // Receive binary chunks & FILE_COMPLETE frames until all files are verified
+    // Receive binary chunks (supporting out-of-order parallel segment offsets) & FILE_COMPLETE frames
     while completed_files < manifest.total_files {
         if cancel_flag.load(Ordering::Relaxed) {
-            record.status = "cancelled".to_string();
+            for (_, mut h) in open_handles.drain() {
+                let _ = h.flush().await;
+            }
+            let db_status = state
+                .db
+                .get_transfer(&record.id)
+                .ok()
+                .flatten()
+                .map(|r| r.status)
+                .unwrap_or_else(|| "paused".to_string());
+            record.status = if db_status == "cancelled" {
+                "cancelled".to_string()
+            } else {
+                "paused".to_string()
+            };
             let _ = state.db.upsert_transfer(&record);
             let _ = app.emit("transfer_state_changed", &record);
-            return Err("Transfer cancelled by user".to_string());
+            return Err("Transfer paused/cancelled".to_string());
         }
 
         let mut header = [0u8; HEADER_LEN];
-        reader
-            .read_exact(&mut header)
-            .await
-            .map_err(|e| format!("Stream read ended early: {e}"))?;
+        if let Err(e) = reader.read_exact(&mut header).await {
+            for (_, mut h) in open_handles.drain() {
+                let _ = h.flush().await;
+            }
+            record.status = "paused".to_string();
+            let _ = state.db.upsert_transfer(&record);
+            let _ = app.emit("transfer_state_changed", &record);
+            return Err(format!("Stream disconnected (saved .raypart for resume): {e}"));
+        }
 
         if &header[0..4] != MAGIC_BYTES {
             return Err("Invalid frame magic bytes (expected RAYD)".to_string());
@@ -709,10 +807,15 @@ where
         }
 
         let mut ciphertext = vec![0u8; cipher_len];
-        reader
-            .read_exact(&mut ciphertext)
-            .await
-            .map_err(|e| e.to_string())?;
+        if let Err(e) = reader.read_exact(&mut ciphertext).await {
+            for (_, mut h) in open_handles.drain() {
+                let _ = h.flush().await;
+            }
+            record.status = "paused".to_string();
+            let _ = state.db.upsert_transfer(&record);
+            let _ = app.emit("transfer_state_changed", &record);
+            return Err(format!("Stream disconnected mid-chunk (saved .raypart for resume): {e}"));
+        }
 
         let plaintext = decrypt_chunk(&session_key, file_id, offset, &header, &ciphertext)?;
 
@@ -723,12 +826,11 @@ where
             if complete.frame_type == "FILE_COMPLETE" {
                 if let Some(mut handle) = open_handles.remove(&complete.file_id) {
                     let _ = handle.flush().await;
+                    let _ = handle.sync_all().await;
                     drop(handle);
                 }
-                if let Some((part_path, final_path, _, hasher)) =
-                    file_map.remove(&complete.file_id)
-                {
-                    let computed_hash = hasher.finalize().to_hex().to_string();
+                if let Some((part_path, final_path, _)) = file_map.remove(&complete.file_id) {
+                    let computed_hash = compute_file_blake3(&part_path).await?;
                     if computed_hash != complete.blake3_hash {
                         record.status = "failed".to_string();
                         let _ = state.db.upsert_transfer(&record);
@@ -748,39 +850,42 @@ where
                 }
             }
         } else {
-            // Data Chunk for `file_id`
+            // Data Chunk for `file_id` at exact `offset` (supports parallel multi-segment writes)
             if !open_handles.contains_key(&file_id) {
-                if let Some((part_path, _, init_offset, _)) = file_map.get(&file_id) {
-                    let mut file = OpenOptions::new()
+                if let Some((part_path, _, _)) = file_map.get(&file_id) {
+                    let file = OpenOptions::new()
                         .create(true)
                         .write(true)
+                        .read(true)
                         .open(part_path)
                         .await
                         .map_err(|e| e.to_string())?;
-                    if *init_offset > 0 {
-                        file.seek(std::io::SeekFrom::Start(*init_offset))
-                            .await
-                            .map_err(|e| e.to_string())?;
-                    } else {
-                        file.set_len(0).await.map_err(|e| e.to_string())?;
-                    }
                     open_handles.insert(file_id, file);
                 }
             }
 
-            if let (Some(file), Some((_, _, _, hasher))) =
-                (open_handles.get_mut(&file_id), file_map.get_mut(&file_id))
-            {
+            if let Some(file) = open_handles.get_mut(&file_id) {
+                file.seek(std::io::SeekFrom::Start(offset))
+                    .await
+                    .map_err(|e| e.to_string())?;
                 file.write_all(&plaintext)
                     .await
                     .map_err(|e| e.to_string())?;
-                hasher.update(&plaintext);
-                record.transferred_bytes += plaintext.len() as u64;
+                record.transferred_bytes =
+                    (record.transferred_bytes + plaintext.len() as u64).min(record.total_bytes);
+            }
+
+            if last_db_sync.elapsed() >= Duration::from_millis(1200) {
+                let _ = state.db.upsert_transfer(&record);
+                last_db_sync = Instant::now();
             }
 
             if last_emit.elapsed() >= Duration::from_millis(120) {
                 let elapsed = start_time.elapsed().as_secs_f64().max(0.001);
-                let speed_mbps = (record.transferred_bytes as f64 / (1024.0 * 1024.0)) / elapsed;
+                let session_delta = record
+                    .transferred_bytes
+                    .saturating_sub(already_received_bytes);
+                let speed_mbps = (session_delta as f64 / (1024.0 * 1024.0)) / elapsed;
                 let remaining = record
                     .total_bytes
                     .saturating_sub(record.transferred_bytes);
@@ -910,6 +1015,40 @@ pub async fn initiate_peer_transfer(
     target_device_id: String,
     file_paths: Vec<String>,
 ) -> Result<String, String> {
+    start_or_resume_transfer(app, state, None, target_device_id, file_paths).await
+}
+
+pub async fn resume_peer_transfer(
+    app: AppHandle,
+    state: Arc<AppState>,
+    session_id: String,
+) -> Result<String, String> {
+    let existing = state
+        .db
+        .get_transfer(&session_id)?
+        .ok_or_else(|| format!("Transfer session {session_id} not found"))?;
+    let source_json = existing
+        .source_paths
+        .ok_or_else(|| "This transfer does not have local source paths to resume".to_string())?;
+    let file_paths: Vec<String> =
+        serde_json::from_str(&source_json).map_err(|e| e.to_string())?;
+    start_or_resume_transfer(
+        app,
+        state,
+        Some(session_id),
+        existing.peer_device_id,
+        file_paths,
+    )
+    .await
+}
+
+async fn start_or_resume_transfer(
+    app: AppHandle,
+    state: Arc<AppState>,
+    existing_session_id: Option<String>,
+    target_device_id: String,
+    file_paths: Vec<String>,
+) -> Result<String, String> {
     let contact = match state.db.get_contact(&target_device_id)? {
         Some(c) => c,
         None => {
@@ -935,8 +1074,18 @@ pub async fn initiate_peer_transfer(
     };
 
     let (files_with_paths, total_bytes) = collect_outgoing_files(&file_paths)?;
-    let session_uuid = Uuid::new_v4();
+    let session_uuid = match &existing_session_id {
+        Some(sid) => Uuid::parse_str(sid).unwrap_or_else(|_| Uuid::new_v4()),
+        None => Uuid::new_v4(),
+    };
     let session_id = session_uuid.to_string();
+    let source_paths_json = serde_json::to_string(&file_paths).ok();
+
+    let prev_transferred = existing_session_id
+        .as_ref()
+        .and_then(|sid| state.db.get_transfer(sid).ok().flatten())
+        .map(|t| t.transferred_bytes)
+        .unwrap_or(0);
 
     // Immediately insert & emit the outgoing TransferRecord so the UI displays the progress bar right away
     let initial_record = TransferRecord {
@@ -951,41 +1100,90 @@ pub async fn initiate_peer_transfer(
         },
         total_files: files_with_paths.len(),
         total_bytes,
-        transferred_bytes: 0,
+        transferred_bytes: prev_transferred,
         status: "in_progress".to_string(),
         target_path: None,
+        source_paths: source_paths_json.clone(),
         created_at: now_unix_secs(),
     };
     let _ = state.db.upsert_transfer(&initial_record);
     let _ = app.emit("transfer_state_changed", &initial_record);
+
+    let cancel_flag = Arc::new(AtomicBool::new(false));
+    state
+        .active_cancellations
+        .lock()
+        .unwrap()
+        .insert(session_id.clone(), cancel_flag.clone());
 
     let app_c = app.clone();
     let state_c = state.clone();
     let sid_c = session_id.clone();
 
     tauri::async_runtime::spawn(async move {
-        if let Err(e) = run_outgoing_session(
-            app_c.clone(),
-            state_c.clone(),
-            sid_c.clone(),
-            session_uuid,
-            contact.clone(),
-            files_with_paths,
-            total_bytes,
-        )
-        .await
-        {
-            warn!("Outgoing transfer {sid_c} failed: {e}");
-            let mut failed_rec = initial_record;
-            failed_rec.status = "failed".to_string();
-            let _ = state_c.db.upsert_transfer(&failed_rec);
-            let _ = app_c.emit("transfer_state_changed", &failed_rec);
+        // Automatic Reconnect & Resume Loop (up to 15 attempts if Wi-Fi drops mid-transfer)
+        let max_attempts = 15usize;
+        for attempt in 1..=max_attempts {
+            if cancel_flag.load(Ordering::Relaxed) {
+                break;
+            }
+
+            match run_outgoing_session(
+                app_c.clone(),
+                state_c.clone(),
+                sid_c.clone(),
+                session_uuid,
+                contact.clone(),
+                files_with_paths.clone(),
+                total_bytes,
+                source_paths_json.clone(),
+                cancel_flag.clone(),
+            )
+            .await
+            {
+                Ok(()) => return,
+                Err(e) => {
+                    if cancel_flag.load(Ordering::Relaxed) {
+                        warn!("Outgoing transfer {sid_c} paused/cancelled by user.");
+                        if let Ok(Some(mut rec)) = state_c.db.get_transfer(&sid_c) {
+                            if rec.status == "in_progress" {
+                                rec.status = "paused".to_string();
+                                let _ = state_c.db.upsert_transfer(&rec);
+                                let _ = app_c.emit("transfer_state_changed", &rec);
+                            }
+                        }
+                        return;
+                    }
+
+                    warn!(
+                        "Outgoing transfer {sid_c} interrupted (attempt {attempt}/{max_attempts}): {e}"
+                    );
+                    if let Ok(Some(mut rec)) = state_c.db.get_transfer(&sid_c) {
+                        rec.status = "paused".to_string();
+                        let _ = state_c.db.upsert_transfer(&rec);
+                        let _ = app_c.emit("transfer_state_changed", &rec);
+                    }
+
+                    if attempt < max_attempts {
+                        // Wait for Wi-Fi / network to stabilize, then automatically resume from `.raypart` offset
+                        tokio::time::sleep(Duration::from_secs(4)).await;
+                        if !cancel_flag.load(Ordering::Relaxed) {
+                            if let Ok(Some(mut rec)) = state_c.db.get_transfer(&sid_c) {
+                                rec.status = "in_progress".to_string();
+                                let _ = state_c.db.upsert_transfer(&rec);
+                                let _ = app_c.emit("transfer_state_changed", &rec);
+                            }
+                        }
+                    }
+                }
+            }
         }
     });
 
     Ok(session_id)
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn run_outgoing_session(
     app: AppHandle,
     state: Arc<AppState>,
@@ -994,9 +1192,19 @@ async fn run_outgoing_session(
     contact: Contact,
     files_with_paths: Vec<(u32, PathBuf, ManifestFileEntry)>,
     total_bytes: u64,
+    source_paths_json: Option<String>,
+    cancel_flag: Arc<AtomicBool>,
 ) -> Result<(), String> {
+    // Refresh latest known contact info from DB in case mDNS or Signaling updated IP/Port
+    let fresh_contact = state
+        .db
+        .get_contact(&contact.device_id)
+        .ok()
+        .flatten()
+        .unwrap_or(contact);
+
     // 1. Try direct LAN TCP connection if LAN IP:Port is already known
-    if let (Some(ip), Some(port)) = (&contact.last_known_ip, contact.last_known_port) {
+    if let (Some(ip), Some(port)) = (&fresh_contact.last_known_ip, fresh_contact.last_known_port) {
         let target_addr = format!("{ip}:{port}");
         if let Ok(Ok(tcp_stream)) = tokio::time::timeout(
             Duration::from_millis(1200),
@@ -1011,9 +1219,11 @@ async fn run_outgoing_session(
                 state,
                 session_id,
                 session_uuid,
-                contact,
+                fresh_contact,
                 files_with_paths,
                 total_bytes,
+                source_paths_json,
+                cancel_flag,
                 reader,
                 writer,
                 "lan_direct".to_string(),
@@ -1050,7 +1260,7 @@ async fn run_outgoing_session(
         "from_device_id": state.identity.device_id,
         "from_alias": my_alias,
         "from_ed25519_pubkey": state.identity.public_hex(),
-        "target_device_id": contact.device_id,
+        "target_device_id": fresh_contact.device_id,
         "lan_candidates": my_lan,
         "wan_candidate": my_wan
     })
@@ -1073,9 +1283,11 @@ async fn run_outgoing_session(
                     state,
                     session_id,
                     session_uuid,
-                    contact,
+                    fresh_contact,
                     files_with_paths,
                     total_bytes,
+                    source_paths_json,
+                    cancel_flag,
                     reader,
                     writer,
                     "lan_direct".to_string(),
@@ -1100,9 +1312,11 @@ async fn run_outgoing_session(
                                     state,
                                     session_id,
                                     session_uuid,
-                                    contact,
+                                    fresh_contact,
                                     files_with_paths,
                                     total_bytes,
+                                    source_paths_json,
+                                    cancel_flag,
                                     recv_stream,
                                     send_stream,
                                     "wan_p2p".to_string(),
@@ -1126,19 +1340,21 @@ async fn run_outgoing_session(
     // frames over the active WSS Signaling tunnel (`RELAY_CONTROL`) when direct sockets are blocked by NAT/Firewall
     info!(
         "Direct socket blocked by NAT/Firewall for session {session_id}; using E2EE WSS stream tunnel to {}",
-        contact.device_id
+        fresh_contact.device_id
     );
     let (relay_reader, relay_writer) =
-        create_ws_relay_stream(state.clone(), session_id.clone(), contact.device_id.clone());
+        create_ws_relay_stream(state.clone(), session_id.clone(), fresh_contact.device_id.clone());
 
     stream_outgoing_files(
         app,
         state,
         session_id,
         session_uuid,
-        contact,
+        fresh_contact,
         files_with_paths,
         total_bytes,
+        source_paths_json,
+        cancel_flag,
         relay_reader,
         relay_writer,
         "wan_p2p".to_string(),
@@ -1155,6 +1371,8 @@ async fn stream_outgoing_files<R, W>(
     contact: Contact,
     files_with_paths: Vec<(u32, PathBuf, ManifestFileEntry)>,
     total_bytes: u64,
+    source_paths_json: Option<String>,
+    cancel_flag: Arc<AtomicBool>,
     mut reader: R,
     mut writer: W,
     network_route: String,
@@ -1210,28 +1428,25 @@ where
     };
     write_json_packet(&mut writer, &manifest).await?;
 
-    let mut record = TransferRecord {
-        id: session_id.clone(),
-        peer_device_id: contact.device_id.clone(),
-        peer_alias: contact.alias_name.clone(),
-        direction: "outgoing".to_string(),
-        network_route: network_route.clone(),
-        total_files: files_with_paths.len(),
-        total_bytes,
-        transferred_bytes: 0,
-        status: "in_progress".to_string(),
-        target_path: None,
-        created_at: now_unix_secs(),
-    };
-    let _ = state.db.upsert_transfer(&record);
-    let _ = app.emit("transfer_state_changed", &record);
-
     // Step 4: Wait for Receiver HANDSHAKE_RESPONSE
     let hs_resp: HandshakeResponseFrame = read_json_packet(&mut reader).await?;
     if hs_resp.status != "ACCEPTED" {
-        record.status = "rejected".to_string();
-        let _ = state.db.upsert_transfer(&record);
-        let _ = app.emit("transfer_state_changed", &record);
+        let rejected_record = TransferRecord {
+            id: session_id.clone(),
+            peer_device_id: contact.device_id.clone(),
+            peer_alias: contact.alias_name.clone(),
+            direction: "outgoing".to_string(),
+            network_route: network_route.clone(),
+            total_files: files_with_paths.len(),
+            total_bytes,
+            transferred_bytes: 0,
+            status: "rejected".to_string(),
+            target_path: None,
+            source_paths: source_paths_json,
+            created_at: now_unix_secs(),
+        };
+        let _ = state.db.upsert_transfer(&rejected_record);
+        let _ = app.emit("transfer_state_changed", &rejected_record);
         return Ok(());
     }
 
@@ -1241,117 +1456,204 @@ where
         .map(|r| (r.file_id, r.offset_bytes))
         .collect();
 
-    let cancel_flag = Arc::new(AtomicBool::new(false));
-    state
-        .active_cancellations
-        .lock()
-        .unwrap()
-        .insert(session_id.clone(), cancel_flag.clone());
+    let already_sent_bytes: u64 = files_with_paths
+        .iter()
+        .map(|(fid, _, entry)| resume_map.get(fid).copied().unwrap_or(0).min(entry.size_bytes))
+        .sum();
+
+    let mut record = TransferRecord {
+        id: session_id.clone(),
+        peer_device_id: contact.device_id.clone(),
+        peer_alias: contact.alias_name.clone(),
+        direction: "outgoing".to_string(),
+        network_route: network_route.clone(),
+        total_files: files_with_paths.len(),
+        total_bytes,
+        transferred_bytes: already_sent_bytes,
+        status: "in_progress".to_string(),
+        target_path: None,
+        source_paths: source_paths_json,
+        created_at: now_unix_secs(),
+    };
+    let _ = state.db.upsert_transfer(&record);
+    let _ = app.emit("transfer_state_changed", &record);
 
     let start_time = Instant::now();
     let mut last_emit = Instant::now();
-    let mut chunk_buf = vec![0u8; CHUNK_SIZE];
+    let mut last_db_sync = Instant::now();
 
-    // Step 5: Stream each file in 512KB ChaCha20-Poly1305 frames + on-the-fly BLAKE3
+    // Step 5: Stream each file using IDM-style Parallel Multi-Segment Reader + Encryptor Workers
     for (file_id, path, entry) in files_with_paths {
-        let mut file = File::open(&path).await.map_err(|e| e.to_string())?;
-        let resume_offset = resume_map.get(&file_id).copied().unwrap_or(0);
-        let mut hasher = blake3::Hasher::new();
+        let resume_offset = resume_map
+            .get(&file_id)
+            .copied()
+            .unwrap_or(0)
+            .min(entry.size_bytes);
 
-        // If resuming from a non-zero offset, hash the skipped prefix first so final BLAKE3 matches full file
-        if resume_offset > 0 && resume_offset < entry.size_bytes {
-            let mut rem = resume_offset as usize;
-            while rem > 0 {
-                let to_read = rem.min(CHUNK_SIZE);
-                let n = file
-                    .read(&mut chunk_buf[..to_read])
+        let path_for_hash = path.clone();
+        let hash_task = tauri::async_runtime::spawn(async move {
+            compute_file_blake3(&path_for_hash).await
+        });
+
+        if resume_offset < entry.size_bytes {
+            let remaining_file_bytes = entry.size_bytes - resume_offset;
+            let worker_count = if remaining_file_bytes >= PARALLEL_THRESHOLD_BYTES {
+                PARALLEL_WORKERS
+            } else {
+                1
+            };
+
+            let next_offset = Arc::new(AtomicU64::new(resume_offset));
+            let (frame_tx, mut frame_rx) =
+                mpsc::channel::<Result<(Vec<u8>, Vec<u8>, usize), String>>(worker_count * 2);
+
+            for _ in 0..worker_count {
+                let path_w = path.clone();
+                let next_offset_w = next_offset.clone();
+                let cancel_w = cancel_flag.clone();
+                let tx_w = frame_tx.clone();
+                let file_size = entry.size_bytes;
+
+                tauri::async_runtime::spawn(async move {
+                    let mut file = match File::open(&path_w).await {
+                        Ok(f) => f,
+                        Err(e) => {
+                            let _ = tx_w.send(Err(e.to_string())).await;
+                            return;
+                        }
+                    };
+                    let mut buf = vec![0u8; CHUNK_SIZE];
+
+                    loop {
+                        if cancel_w.load(Ordering::Relaxed) {
+                            break;
+                        }
+                        let chunk_offset =
+                            next_offset_w.fetch_add(CHUNK_SIZE as u64, Ordering::SeqCst);
+                        if chunk_offset >= file_size {
+                            break;
+                        }
+
+                        let to_read = ((file_size - chunk_offset) as usize).min(CHUNK_SIZE);
+                        if let Err(e) = file.seek(std::io::SeekFrom::Start(chunk_offset)).await {
+                            let _ = tx_w.send(Err(e.to_string())).await;
+                            break;
+                        }
+                        if let Err(e) = file.read_exact(&mut buf[..to_read]).await {
+                            let _ = tx_w.send(Err(e.to_string())).await;
+                            break;
+                        }
+
+                        let cipher_len = (to_read + 16) as u32;
+                        let mut header = [0u8; HEADER_LEN];
+                        header[0..4].copy_from_slice(MAGIC_BYTES);
+                        header[4..20].copy_from_slice(&session_id_bytes);
+                        header[20..24].copy_from_slice(&file_id.to_be_bytes());
+                        header[24..32].copy_from_slice(&chunk_offset.to_be_bytes());
+                        header[32..36].copy_from_slice(&cipher_len.to_be_bytes());
+
+                        match encrypt_chunk(
+                            &session_key,
+                            file_id,
+                            chunk_offset,
+                            &header,
+                            &buf[..to_read],
+                        ) {
+                            Ok(ciphertext) => {
+                                if tx_w
+                                    .send(Ok((header.to_vec(), ciphertext, to_read)))
+                                    .await
+                                    .is_err()
+                                {
+                                    break;
+                                }
+                            }
+                            Err(e) => {
+                                let _ = tx_w.send(Err(e)).await;
+                                break;
+                            }
+                        }
+                    }
+                });
+            }
+            drop(frame_tx);
+
+            while let Some(frame_res) = frame_rx.recv().await {
+                if cancel_flag.load(Ordering::Relaxed) {
+                    let db_status = state
+                        .db
+                        .get_transfer(&record.id)
+                        .ok()
+                        .flatten()
+                        .map(|r| r.status)
+                        .unwrap_or_else(|| "paused".to_string());
+                    record.status = if db_status == "cancelled" {
+                        "cancelled".to_string()
+                    } else {
+                        "paused".to_string()
+                    };
+                    let _ = state.db.upsert_transfer(&record);
+                    let _ = app.emit("transfer_state_changed", &record);
+                    return Err("Outgoing transfer paused/cancelled".to_string());
+                }
+
+                let (header, ciphertext, plain_len) = frame_res?;
+                writer
+                    .write_all(&header)
                     .await
                     .map_err(|e| e.to_string())?;
-                if n == 0 {
-                    break;
+                writer
+                    .write_all(&ciphertext)
+                    .await
+                    .map_err(|e| e.to_string())?;
+
+                record.transferred_bytes =
+                    (record.transferred_bytes + plain_len as u64).min(record.total_bytes);
+
+                if last_db_sync.elapsed() >= Duration::from_millis(1200) {
+                    let _ = state.db.upsert_transfer(&record);
+                    last_db_sync = Instant::now();
                 }
-                hasher.update(&chunk_buf[..n]);
-                rem -= n;
-            }
-            record.transferred_bytes += resume_offset;
-        }
 
-        let mut offset = resume_offset;
-        loop {
-            if cancel_flag.load(Ordering::Relaxed) {
-                record.status = "cancelled".to_string();
-                let _ = state.db.upsert_transfer(&record);
-                let _ = app.emit("transfer_state_changed", &record);
-                return Err("Outgoing transfer cancelled by user".to_string());
-            }
+                if last_emit.elapsed() >= Duration::from_millis(120) {
+                    let elapsed = start_time.elapsed().as_secs_f64().max(0.001);
+                    let session_delta = record
+                        .transferred_bytes
+                        .saturating_sub(already_sent_bytes);
+                    let speed_mbps = (session_delta as f64 / (1024.0 * 1024.0)) / elapsed;
+                    let remaining = record
+                        .total_bytes
+                        .saturating_sub(record.transferred_bytes);
+                    let eta_seconds = if speed_mbps > 0.01 {
+                        ((remaining as f64 / (1024.0 * 1024.0)) / speed_mbps) as u64
+                    } else {
+                        0
+                    };
 
-            let n = file
-                .read(&mut chunk_buf)
-                .await
-                .map_err(|e| e.to_string())?;
-            if n == 0 {
-                break;
-            }
-
-            let plain_slice = &chunk_buf[..n];
-            hasher.update(plain_slice);
-
-            let cipher_len = (n + 16) as u32;
-            let mut header = [0u8; HEADER_LEN];
-            header[0..4].copy_from_slice(MAGIC_BYTES);
-            header[4..20].copy_from_slice(&session_id_bytes);
-            header[20..24].copy_from_slice(&file_id.to_be_bytes());
-            header[24..32].copy_from_slice(&offset.to_be_bytes());
-            header[32..36].copy_from_slice(&cipher_len.to_be_bytes());
-
-            let ciphertext =
-                encrypt_chunk(&session_key, file_id, offset, &header, plain_slice)?;
-
-            writer
-                .write_all(&header)
-                .await
-                .map_err(|e| e.to_string())?;
-            writer
-                .write_all(&ciphertext)
-                .await
-                .map_err(|e| e.to_string())?;
-
-            offset += n as u64;
-            record.transferred_bytes += n as u64;
-
-            if last_emit.elapsed() >= Duration::from_millis(120) {
-                let elapsed = start_time.elapsed().as_secs_f64().max(0.001);
-                let speed_mbps = (record.transferred_bytes as f64 / (1024.0 * 1024.0)) / elapsed;
-                let remaining = record
-                    .total_bytes
-                    .saturating_sub(record.transferred_bytes);
-                let eta_seconds = if speed_mbps > 0.01 {
-                    ((remaining as f64 / (1024.0 * 1024.0)) / speed_mbps) as u64
-                } else {
-                    0
-                };
-
-                let _ = app.emit(
-                    "transfer_progress",
-                    &TransferProgressEvent {
-                        session_id: record.id.clone(),
-                        peer_device_id: record.peer_device_id.clone(),
-                        peer_alias: record.peer_alias.clone(),
-                        direction: "outgoing".to_string(),
-                        network_route: network_route.clone(),
-                        transferred_bytes: record.transferred_bytes,
-                        total_bytes: record.total_bytes,
-                        speed_mbps,
-                        eta_seconds,
-                        status: "in_progress".to_string(),
-                    },
-                );
-                last_emit = Instant::now();
+                    let _ = app.emit(
+                        "transfer_progress",
+                        &TransferProgressEvent {
+                            session_id: record.id.clone(),
+                            peer_device_id: record.peer_device_id.clone(),
+                            peer_alias: record.peer_alias.clone(),
+                            direction: "outgoing".to_string(),
+                            network_route: network_route.clone(),
+                            transferred_bytes: record.transferred_bytes,
+                            total_bytes: record.total_bytes,
+                            speed_mbps,
+                            eta_seconds,
+                            status: "in_progress".to_string(),
+                        },
+                    );
+                    last_emit = Instant::now();
+                }
             }
         }
 
         // Send encrypted FILE_COMPLETE control frame (file_id = 0, offset = file_id as u64)
-        let final_hash = hasher.finalize().to_hex().to_string();
+        let final_hash = hash_task
+            .await
+            .map_err(|e| e.to_string())??;
         let complete_frame = FileCompleteFrame {
             frame_type: "FILE_COMPLETE".to_string(),
             session_id: session_id.clone(),

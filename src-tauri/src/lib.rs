@@ -270,6 +270,8 @@ pub fn run() {
             commands::add_wan_contact,
             commands::update_contact_trust,
             commands::initiate_transfer,
+            commands::resume_transfer,
+            commands::pause_transfer,
             commands::respond_transfer_request,
             commands::cancel_transfer,
             commands::get_transfer_history,

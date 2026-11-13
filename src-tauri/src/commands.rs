@@ -1,11 +1,11 @@
 use crate::db::storage::{now_unix_secs, AppSettings, Contact, TransferRecord};
-use crate::network::transport::initiate_peer_transfer;
+use crate::network::transport::{initiate_peer_transfer, resume_peer_transfer};
 use crate::os::{register_context_menu, set_autostart};
 use crate::state::{AppState, IncomingRequestDecision};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::sync::{atomic::Ordering, Arc};
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, Emitter, State};
 
 #[derive(Serialize)]
 pub struct AppStateSnapshot {
@@ -394,6 +394,37 @@ pub async fn initiate_transfer(
 }
 
 #[tauri::command]
+pub async fn resume_transfer(
+    app: AppHandle,
+    state: State<'_, Arc<AppState>>,
+    session_id: String,
+) -> Result<String, String> {
+    resume_peer_transfer(app, state.inner().clone(), session_id).await
+}
+
+#[tauri::command]
+pub fn pause_transfer(
+    app: AppHandle,
+    state: State<'_, Arc<AppState>>,
+    session_id: String,
+) -> Result<(), String> {
+    if let Some(flag) = state
+        .active_cancellations
+        .lock()
+        .map_err(|e| e.to_string())?
+        .get(&session_id)
+    {
+        flag.store(true, Ordering::Relaxed);
+    }
+    if let Ok(Some(mut rec)) = state.db.get_transfer(&session_id) {
+        rec.status = "paused".to_string();
+        let _ = state.db.upsert_transfer(&rec);
+        let _ = app.emit("transfer_state_changed", &rec);
+    }
+    Ok(())
+}
+
+#[tauri::command]
 pub fn respond_transfer_request(
     state: State<'_, Arc<AppState>>,
     session_id: String,
@@ -416,6 +447,7 @@ pub fn respond_transfer_request(
 
 #[tauri::command]
 pub fn cancel_transfer(
+    app: AppHandle,
     state: State<'_, Arc<AppState>>,
     session_id: String,
 ) -> Result<(), String> {
@@ -426,6 +458,11 @@ pub fn cancel_transfer(
         .get(&session_id)
     {
         flag.store(true, Ordering::Relaxed);
+    }
+    if let Ok(Some(mut rec)) = state.db.get_transfer(&session_id) {
+        rec.status = "cancelled".to_string();
+        let _ = state.db.upsert_transfer(&rec);
+        let _ = app.emit("transfer_state_changed", &rec);
     }
     Ok(())
 }

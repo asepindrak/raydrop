@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { getCurrentWindow, UserAttentionType } from '@tauri-apps/api/window';
   import Header from './lib/components/Header.svelte';
   import ContactList from './lib/components/ContactList.svelte';
   import ActiveTransfers from './lib/components/ActiveTransfers.svelte';
@@ -104,8 +105,21 @@
 
     await raydropApi.listenEvent<IncomingTransferEvent>(
       'incoming_transfer_request',
-      (evt) => {
+      async (evt) => {
         incomingRequestQueue.update((q) => [...q, evt]);
+        try {
+          const win = getCurrentWindow();
+          await win.setAlwaysOnTop(true);
+          await win.show();
+          await win.unminimize();
+          await win.setFocus();
+          await win.requestUserAttention(UserAttentionType.Critical);
+          setTimeout(() => {
+            win.setAlwaysOnTop(false).catch(() => {});
+          }, 1800);
+        } catch (err) {
+          console.warn('Window auto-focus fallback error:', err);
+        }
       }
     );
 
