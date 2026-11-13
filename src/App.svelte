@@ -64,6 +64,19 @@
     });
     if (snap.queued_cli_files.length > 0) {
       cliQueuedFiles.set(snap.queued_cli_files);
+      try {
+        const win = getCurrentWindow();
+        await win.setAlwaysOnTop(true);
+        await win.show();
+        await win.unminimize();
+        await win.setFocus();
+        await win.requestUserAttention(UserAttentionType.Critical);
+        setTimeout(() => {
+          win.setAlwaysOnTop(false).catch(() => {});
+        }, 1800);
+      } catch (err) {
+        console.warn('Window focus error on init cli:', err);
+      }
     }
 
     contacts.set(await raydropApi.getContacts());
@@ -137,8 +150,21 @@
       }
     );
 
-    await raydropApi.listenEvent<string[]>('cli_send_files', (paths) => {
+    await raydropApi.listenEvent<string[]>('cli_send_files', async (paths) => {
       cliQueuedFiles.update((prev) => [...prev, ...paths]);
+      try {
+        const win = getCurrentWindow();
+        await win.setAlwaysOnTop(true);
+        await win.show();
+        await win.unminimize();
+        await win.setFocus();
+        await win.requestUserAttention(UserAttentionType.Critical);
+        setTimeout(() => {
+          win.setAlwaysOnTop(false).catch(() => {});
+        }, 1800);
+      } catch (err) {
+        console.warn('Window focus error on cli send:', err);
+      }
     });
   });
 </script>

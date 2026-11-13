@@ -73,7 +73,7 @@ pub fn run() {
         pending_requests: Mutex::new(HashMap::new()),
         active_cancellations: Mutex::new(HashMap::new()),
         pending_wan_candidates: Mutex::new(HashMap::new()),
-        queued_cli_files: Mutex::new(initial_send_paths),
+        queued_cli_files: Mutex::new(initial_send_paths.clone()),
     });
 
     let state_for_single_instance = app_state.clone();
@@ -82,10 +82,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(move |app, argv, _cwd| {
             let paths = extract_send_paths(&argv);
-            if let Some(window) = app.get_webview_window("main") {
-                let _ = window.show();
-                let _ = window.set_focus();
-            }
+            crate::network::transport::popup_and_focus_main_window(app);
             if !paths.is_empty() {
                 info!("Received CLI --send paths from secondary instance: {:?}", paths);
                 if let Ok(mut q) = state_for_single_instance.queued_cli_files.lock() {
@@ -240,6 +237,9 @@ pub fn run() {
                     let _ = main_win.show();
                     let _ = main_win.unminimize();
                     let _ = main_win.set_focus();
+                    if !initial_send_paths.is_empty() {
+                        crate::network::transport::popup_and_focus_main_window(&handle);
+                    }
                 }
                 let win_clone = main_win.clone();
                 main_win.on_window_event(move |event| {

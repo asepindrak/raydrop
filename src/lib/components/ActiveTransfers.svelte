@@ -19,11 +19,13 @@
     FileText,
     ChevronDown,
     ChevronUp,
+    Clock,
   } from 'lucide-svelte';
 
   let resumingId = '';
   let actionError = '';
   let expandedTransferIds: Record<string, boolean> = {};
+  let transferFilter: 'all' | 'incoming' | 'outgoing' = 'all';
 
   function toggleExpanded(id: string) {
     expandedTransferIds = {
@@ -35,6 +37,33 @@
   function calcPercent(transferred: number, total: number): number {
     if (total <= 0) return 0;
     return Math.min(100, Math.round((transferred / total) * 100));
+  }
+
+  function formatTransferTime(unixSecs: number): string {
+    if (!unixSecs) return '';
+    const date = new Date(unixSecs * 1000);
+    const now = new Date();
+    const isToday = date.toDateString() === now.toDateString();
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const seconds = String(date.getSeconds()).padStart(2, '0');
+    const timeStr = `${hours}:${minutes}:${seconds}`;
+
+    if (isToday) {
+      return `Hari ini, ${timeStr}`;
+    }
+
+    const yesterday = new Date();
+    yesterday.setDate(now.getDate() - 1);
+    if (date.toDateString() === yesterday.toDateString()) {
+      return `Kemarin, ${timeStr}`;
+    }
+
+    const day = date.getDate();
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+    const month = months[date.getMonth()];
+    const year = date.getFullYear();
+    return `${day} ${month} ${year}, ${timeStr}`;
   }
 
   function parseFilePaths(sourcePathsJson?: string | null): string[] {
@@ -62,6 +91,24 @@
     }
     return null;
   }
+
+  $: filteredActive = $activeTransfers.filter((t) => {
+    if (transferFilter === 'all') return true;
+    return t.direction === transferFilter;
+  });
+
+  $: filteredHistory = $historicalTransfers.filter((h) => {
+    if (transferFilter === 'all') return true;
+    return h.direction === transferFilter;
+  });
+
+  $: incomingCount =
+    $activeTransfers.filter((t) => t.direction === 'incoming').length +
+    $historicalTransfers.filter((h) => h.direction === 'incoming').length;
+
+  $: outgoingCount =
+    $activeTransfers.filter((t) => t.direction === 'outgoing').length +
+    $historicalTransfers.filter((h) => h.direction === 'outgoing').length;
 
   async function handleOpenFile(path: string) {
     actionError = '';
@@ -104,27 +151,70 @@
 </script>
 
 <div class="flex flex-col h-full bg-slate-900/40 border border-slate-800/80 rounded-2xl overflow-hidden">
+  <!-- Header Bar -->
   <div class="p-4 border-b border-slate-800/80 flex items-center justify-between gap-2">
     <div class="flex items-center gap-2">
       <Activity class="w-4 h-4 text-cyan-400" />
-      <h2 class="text-sm font-bold text-white">Transfers & Encrypted Streams</h2>
+      <h2 class="text-sm font-bold text-white">Transfers & Streams</h2>
     </div>
-    <div class="flex items-center gap-2">
-      {#if $appSettings.download_dir}
-        <button
-          on:click={() => handleOpenFolder($appSettings.download_dir)}
-          class="flex items-center gap-1.5 text-[11px] text-slate-300 hover:text-white bg-slate-800/90 hover:bg-slate-700/90 px-2.5 py-1 rounded-full border border-slate-700 transition"
-          title="Buka Folder Download ({$appSettings.download_dir})"
-        >
-          <FolderOpen class="w-3.5 h-3.5 text-cyan-400" />
-          <span>Folder Download</span>
-        </button>
-      {/if}
-      <div class="flex items-center gap-1.5 text-[11px] text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">
-        <ShieldCheck class="w-3.5 h-3.5" />
-        <span>6x Parallel • Synced</span>
-      </div>
+    <div class="flex items-center gap-1.5 text-[11px] text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">
+      <ShieldCheck class="w-3.5 h-3.5" />
+      <span>6x Parallel • Synced</span>
     </div>
+  </div>
+
+  <!-- Filter Tabs: Semua / Diterima / Dikirim -->
+  <div class="px-4 py-2.5 border-b border-slate-800/80 flex items-center justify-between gap-2 bg-slate-950/60">
+    <div class="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800">
+      <button
+        on:click={() => (transferFilter = 'all')}
+        class="flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-all {transferFilter === 'all'
+          ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
+          : 'text-slate-400 hover:text-slate-200'}"
+      >
+        <span>Semua</span>
+        <span class="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-800 text-slate-300 font-mono">
+          {$activeTransfers.length + $historicalTransfers.length}
+        </span>
+      </button>
+
+      <button
+        on:click={() => (transferFilter = 'incoming')}
+        class="flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-all {transferFilter === 'incoming'
+          ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+          : 'text-slate-400 hover:text-slate-200'}"
+      >
+        <ArrowDownLeft class="w-3.5 h-3.5 text-emerald-400" />
+        <span>Diterima</span>
+        <span class="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-800 text-emerald-400 font-mono">
+          {incomingCount}
+        </span>
+      </button>
+
+      <button
+        on:click={() => (transferFilter = 'outgoing')}
+        class="flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-all {transferFilter === 'outgoing'
+          ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
+          : 'text-slate-400 hover:text-slate-200'}"
+      >
+        <ArrowUpRight class="w-3.5 h-3.5 text-cyan-400" />
+        <span>Dikirim</span>
+        <span class="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-800 text-cyan-300 font-mono">
+          {outgoingCount}
+        </span>
+      </button>
+    </div>
+
+    {#if $appSettings.download_dir}
+      <button
+        on:click={() => handleOpenFolder($appSettings.download_dir)}
+        class="flex items-center gap-1.5 text-[11px] text-slate-300 hover:text-white bg-slate-800/90 hover:bg-slate-700/90 px-2.5 py-1 rounded-lg border border-slate-700 transition shrink-0"
+        title="Buka Folder Download ({$appSettings.download_dir})"
+      >
+        <FolderOpen class="w-3.5 h-3.5 text-amber-400" />
+        <span>Folder Download</span>
+      </button>
+    {/if}
   </div>
 
   <div class="flex-1 overflow-y-auto p-4 space-y-3">
@@ -136,12 +226,12 @@
     {/if}
 
     <!-- Active / Paused Resumable Streaming Transfers -->
-    {#if $activeTransfers.length > 0}
+    {#if filteredActive.length > 0}
       <div class="space-y-2.5">
         <p class="text-[11px] font-semibold uppercase tracking-wider text-cyan-400">
-          Active & Resumable Streams ({$activeTransfers.length})
+          Proses Transfer Berjalan ({filteredActive.length})
         </p>
-        {#each $activeTransfers as t (t.id)}
+        {#each filteredActive as t (t.id)}
           {@const pct = calcPercent(t.transferred_bytes, t.total_bytes)}
           {@const isParallel = t.total_bytes >= 4 * 1024 * 1024}
           {@const activeFiles = parseFilePaths(t.source_paths)}
@@ -149,9 +239,15 @@
             <div class="flex items-center justify-between gap-2">
               <div class="flex items-center gap-1.5 flex-wrap min-w-0">
                 {#if t.direction === 'outgoing'}
-                  <ArrowUpRight class="w-4 h-4 text-cyan-400 shrink-0" />
+                  <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 flex items-center gap-1">
+                    <ArrowUpRight class="w-3 h-3 text-cyan-400 shrink-0" />
+                    Dikirim ke
+                  </span>
                 {:else}
-                  <ArrowDownLeft class="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
+                    <ArrowDownLeft class="w-3 h-3 text-emerald-400 shrink-0" />
+                    Diterima dari
+                  </span>
                 {/if}
                 <span class="text-xs font-semibold text-white truncate">{t.peer_alias}</span>
                 <span class="text-[10px] font-mono uppercase px-1.5 py-0.5 rounded bg-slate-800 text-cyan-300 border border-slate-700">
@@ -175,7 +271,7 @@
                   <button
                     on:click={() => handlePause(t.id)}
                     class="text-xs text-amber-300 hover:text-amber-200 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 px-2 py-1 rounded-lg flex items-center gap-1 transition"
-                    title="Pause transfer (can be resumed anytime)"
+                    title="Pause transfer (bisa dilanjutkan kapan saja)"
                   >
                     <Pause class="w-3 h-3" />
                     <span>Pause</span>
@@ -186,14 +282,14 @@
                       on:click={() => handleResume(t.id)}
                       disabled={resumingId === t.id}
                       class="text-xs text-emerald-300 hover:text-emerald-200 bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 px-2.5 py-1 rounded-lg flex items-center gap-1 transition disabled:opacity-50"
-                      title="Continue transfer from exact .raypart byte offset"
+                      title="Lanjutkan transfer tepat dari byte terakhir .raypart"
                     >
                       <Play class="w-3 h-3" />
                       <span>{resumingId === t.id ? 'Reconnecting...' : 'Resume'}</span>
                     </button>
                   {:else}
                     <span class="text-[10px] text-amber-300/90 font-mono">
-                      Auto-resumes when sender reconnects
+                      Otomatis lanjut saat pengirim tersambung
                     </span>
                   {/if}
                 {/if}
@@ -201,7 +297,7 @@
                 <button
                   on:click={() => raydropApi.cancelTransfer(t.id)}
                   class="text-xs text-rose-400 hover:text-rose-300 flex items-center gap-1 px-1.5 py-1"
-                  title="Cancel transfer"
+                  title="Batalkan transfer"
                 >
                   <XCircle class="w-3.5 h-3.5" />
                 </button>
@@ -219,12 +315,21 @@
             <div class="flex items-center justify-between text-[11px] font-mono text-slate-400">
               <span>{formatBytes(t.transferred_bytes)} / {formatBytes(t.total_bytes)} ({pct}%)</span>
               {#if t.status === 'paused'}
-                <span class="text-amber-300">Saved checkpoint (.raypart) • Ready to resume</span>
+                <span class="text-amber-300">Saved checkpoint (.raypart) • Siap dilanjutkan</span>
               {:else}
                 <span>
                   {(t.speed_mbps ?? 0).toFixed(1)} MB/s • ETA {t.eta_seconds ?? 0}s
                 </span>
               {/if}
+            </div>
+
+            <!-- Transfer Time & Status -->
+            <div class="flex items-center justify-between text-[10px] font-mono text-slate-500 pt-1 border-t border-slate-800/60">
+              <div class="flex items-center gap-1 text-slate-400">
+                <Clock class="w-3 h-3 text-slate-500 shrink-0" />
+                <span>Waktu mulai: {formatTransferTime(t.created_at)}</span>
+              </div>
+              <span class="text-cyan-400 font-semibold">{t.total_files} file</span>
             </div>
 
             {#if activeFiles.length > 0}
@@ -260,9 +365,9 @@
     <!-- Transfer History -->
     <div class="space-y-2.5">
       <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-        Recent History ({$historicalTransfers.length})
+        Riwayat Transfer ({filteredHistory.length})
       </p>
-      {#each $historicalTransfers as h (h.id)}
+      {#each filteredHistory as h (h.id)}
         {@const filePaths = parseFilePaths(h.source_paths)}
         {@const fallbackFolder = getFallbackFolder(h)}
         {@const isExpanded = expandedTransferIds[h.id] ?? true}
@@ -276,15 +381,28 @@
                 <AlertTriangle class="w-4 h-4 text-amber-400 shrink-0" />
               {/if}
               <div class="min-w-0">
-                <div class="flex items-center gap-1.5">
+                <div class="flex items-center gap-1.5 flex-wrap">
+                  {#if h.direction === 'outgoing'}
+                    <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 flex items-center gap-1">
+                      <ArrowUpRight class="w-3 h-3 text-cyan-400 shrink-0" />
+                      Dikirim ke
+                    </span>
+                  {:else}
+                    <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
+                      <ArrowDownLeft class="w-3 h-3 text-emerald-400 shrink-0" />
+                      Diterima dari
+                    </span>
+                  {/if}
                   <span class="text-xs font-semibold text-slate-100 truncate">{h.peer_alias}</span>
-                  <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
-                    {h.direction === 'outgoing' ? 'Terkirim' : 'Diterima'}
-                  </span>
                 </div>
-                <p class="text-[11px] font-mono text-slate-400 mt-0.5">
-                  {h.total_files} file • {formatBytes(h.transferred_bytes)} / {formatBytes(h.total_bytes)}
-                </p>
+                <div class="flex items-center gap-2 mt-1 flex-wrap text-[11px] font-mono text-slate-400">
+                  <span>{h.total_files} file • {formatBytes(h.transferred_bytes)} / {formatBytes(h.total_bytes)}</span>
+                  <span class="text-slate-600">•</span>
+                  <div class="flex items-center gap-1 text-slate-400" title="Waktu transfer">
+                    <Clock class="w-3 h-3 text-slate-500 shrink-0" />
+                    <span>{formatTransferTime(h.created_at)}</span>
+                  </div>
+                </div>
               </div>
             </div>
             <div class="flex items-center gap-1.5 shrink-0">
@@ -293,7 +411,7 @@
                   on:click={() => handleResume(h.id)}
                   disabled={resumingId === h.id}
                   class="text-[11px] text-cyan-300 hover:text-cyan-200 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 px-2 py-0.5 rounded-lg flex items-center gap-1 transition"
-                  title="Resume / retry transfer from checkpoint"
+                  title="Lanjutkan / coba ulang transfer dari checkpoint"
                 >
                   <RotateCcw class="w-3 h-3" />
                   <span>Resume</span>
@@ -388,14 +506,18 @@
           {/if}
         </div>
       {:else}
-        {#if $activeTransfers.length === 0}
-          <div class="h-44 flex flex-col items-center justify-center text-center px-4">
-            <p class="text-xs text-slate-400">No active or historical transfers yet.</p>
-            <p class="text-[11px] text-slate-500 mt-1">
-              Right-click any file or folder in your OS Explorer/Finder and choose "Send with Raydrop".
-            </p>
-          </div>
-        {/if}
+        <div class="h-44 flex flex-col items-center justify-center text-center px-4">
+          <p class="text-xs text-slate-400">
+            {transferFilter === 'incoming'
+              ? 'Belum ada file yang diterima.'
+              : transferFilter === 'outgoing'
+                ? 'Belum ada file yang dikirim.'
+                : 'Belum ada proses atau riwayat transfer.'}
+          </p>
+          <p class="text-[11px] text-slate-500 mt-1">
+            Klik kanan file di File Explorer lalu pilih "Send with Raydrop" untuk mengirim file.
+          </p>
+        </div>
       {/each}
     </div>
   </div>
