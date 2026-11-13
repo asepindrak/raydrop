@@ -1,4 +1,4 @@
-# ==============================================================================
+﻿# ==============================================================================
 # Raydrop Automated GitHub Release & Landing Page Sync Script
 # ==============================================================================
 # Usage:
@@ -24,8 +24,12 @@ function Write-Utf8NoBom($path, $text) {
     [System.IO.File]::WriteAllText($path, $text, $utf8NoBom)
 }
 
+function Read-Utf8($path) {
+    return [System.IO.File]::ReadAllText($path, [System.Text.Encoding]::UTF8)
+}
+
 # 1. Read Version
-$pkgJson = Get-Content "$repoRoot/package.json" -Raw | ConvertFrom-Json
+$pkgJson = Read-Utf8 "$repoRoot/package.json" | ConvertFrom-Json
 $ver = $pkgJson.version
 $tag = "v$ver"
 
@@ -39,7 +43,7 @@ Write-Host "Syncing version $ver across all project files..." -ForegroundColor Y
 # tauri.conf.json
 $tauriConfPath = "$repoRoot/src-tauri/tauri.conf.json"
 if (Test-Path $tauriConfPath) {
-    $tConf = Get-Content $tauriConfPath -Raw
+    $tConf = Read-Utf8 $tauriConfPath
     $tConf = $tConf -replace '"version":\s*"[^"]+"', "`"version`": `"$ver`""
     Write-Utf8NoBom $tauriConfPath $tConf
 }
@@ -47,7 +51,7 @@ if (Test-Path $tauriConfPath) {
 # Cargo.toml
 $cargoPath = "$repoRoot/src-tauri/Cargo.toml"
 if (Test-Path $cargoPath) {
-    $cContent = Get-Content $cargoPath -Raw
+    $cContent = Read-Utf8 $cargoPath
     $cContent = $cContent -replace '(?m)^version\s*=\s*"[^"]+"', "version = `"$ver`""
     Write-Utf8NoBom $cargoPath $cContent
 }
@@ -55,7 +59,7 @@ if (Test-Path $cargoPath) {
 # Header.svelte
 $headerPath = "$repoRoot/src/lib/components/Header.svelte"
 if (Test-Path $headerPath) {
-    $hContent = Get-Content $headerPath -Raw
+    $hContent = Read-Utf8 $headerPath
     $hContent = $hContent -replace 'v\d+\.\d+\.\d+', "v$ver"
     Write-Utf8NoBom $headerPath $hContent
 }
@@ -63,7 +67,7 @@ if (Test-Path $headerPath) {
 # TraySettings.svelte
 $settingsPath = "$repoRoot/src/lib/components/TraySettings.svelte"
 if (Test-Path $settingsPath) {
-    $sPath = Get-Content $settingsPath -Raw
+    $sPath = Read-Utf8 $settingsPath
     $sPath = $sPath -replace 'Current:\s*v\d+\.\d+\.\d+', "Current: v$ver"
     Write-Utf8NoBom $settingsPath $sPath
 }
@@ -71,7 +75,7 @@ if (Test-Path $settingsPath) {
 # README.md
 $readmePath = "$repoRoot/README.md"
 if (Test-Path $readmePath) {
-    $rContent = Get-Content $readmePath -Raw
+    $rContent = Read-Utf8 $readmePath
     $rContent = $rContent -replace 'Latest Release \(v[\d\.]+\)', "Latest Release ($tag)"
     Write-Utf8NoBom $readmePath $rContent
 }
@@ -79,7 +83,7 @@ if (Test-Path $readmePath) {
 # landing/index.html
 $landingHtmlPath = "$repoRoot/landing/index.html"
 if (Test-Path $landingHtmlPath) {
-    $landingContent = Get-Content $landingHtmlPath -Raw
+    $landingContent = Read-Utf8 $landingHtmlPath
     $landingContent = $landingContent -replace 'Raydrop_[\d\.]+_x64_en-US\.msi', "Raydrop_${ver}_x64_en-US.msi"
     $landingContent = $landingContent -replace 'Raydrop_[\d\.]+_x64-portable\.exe', "Raydrop_${ver}_x64-portable.exe"
     $landingContent = $landingContent -replace 'download/v[\d\.]+/Raydrop', "download/$tag/Raydrop"
