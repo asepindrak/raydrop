@@ -84,16 +84,61 @@ pub fn start_signaling_daemon(app: AppHandle, state: Arc<AppState>) {
                     }
 
                     let writer = tokio::spawn(async move {
-                        while let Some(outbound) = rx.recv().await {
-                            if ws_tx.send(Message::Text(outbound)).await.is_err() {
-                                break;
+                        let mut ping_interval = tokio::time::interval(Duration::from_secs(15));
+                        ping_interval.tick().await;
+
+                        loop {
+                            tokio::select! {
+                                outbound_opt = rx.recv() => {
+                                    match outbound_opt {
+                                        Some(outbound) => {
+                                            if ws_tx.send(Message::Text(outbound)).await.is_err() {
+                                                break;
+                                            }
+                                        }
+                                        None => break,
+                                    }
+                                }
+                                _ = ping_interval.tick() => {
+                                    // Send keepalive ping to maintain NAT state tables and firewall tunnels open indefinitely
+                                    if ws_tx.send(Message::Ping(vec![0x52, 0x41, 0x59, 0x44])).await.is_err() {
+                                        break;
+                                    }
+                                }
                             }
                         }
                     });
 
-                    while let Some(Ok(msg)) = ws_rx.next().await {
-                        if let Message::Text(text) = msg {
-                            handle_signaling_message(&app, &state, &text).await;
+                    loop {
+                        // Dead Peer Detection: If no message, ping, or pong is received within 45s,
+                        // assume intermediate NAT/firewall dropped the silent TCP socket and force reconnect
+                        let next_frame = tokio::time::timeout(Duration::from_secs(45), ws_rx.next()).await;
+                        match next_frame {
+                            Ok(Some(Ok(msg))) => match msg {
+                                Message::Text(text) => {
+                                    handle_signaling_message(&app, &state, &text).await;
+                                }
+                                Message::Ping(_) | Message::Pong(_) => {
+                                    // Heartbeat alive!
+                                }
+                                Message::Close(_) => {
+                                    info!("Signaling WebSocket closed by server");
+                                    break;
+                                }
+                                _ => {}
+                            },
+                            Ok(Some(Err(e))) => {
+                                warn!("Signaling WebSocket connection error: {e}");
+                                break;
+                            }
+                            Ok(None) => {
+                                info!("Signaling WebSocket stream ended");
+                                break;
+                            }
+                            Err(_) => {
+                                warn!("Signaling WebSocket idle heartbeat timeout (45s) — forcing reconnect");
+                                break;
+                            }
                         }
                     }
 
@@ -109,7 +154,7 @@ pub fn start_signaling_daemon(app: AppHandle, state: Arc<AppState>) {
                 }
             }
 
-            tokio::time::sleep(Duration::from_secs(6)).await;
+            tokio::time::sleep(Duration::from_secs(3)).await;
         }
     });
 }

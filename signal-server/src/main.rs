@@ -1148,9 +1148,22 @@ async fn handle_socket(socket: WebSocket, client_ip: String, state: ServerState)
     let (tx, mut rx) = mpsc::channel::<String>(PEER_CHANNEL_CAPACITY);
 
     let writer_task = tokio::spawn(async move {
-        while let Some(msg) = rx.recv().await {
-            if ws_tx.send(Message::Text(msg)).await.is_err() {
-                break;
+        let mut ping_interval = tokio::time::interval(std::time::Duration::from_secs(20));
+        ping_interval.tick().await;
+
+        loop {
+            tokio::select! {
+                Some(msg) = rx.recv() => {
+                    if ws_tx.send(Message::Text(msg)).await.is_err() {
+                        break;
+                    }
+                }
+                _ = ping_interval.tick() => {
+                    if ws_tx.send(Message::Ping(vec![0x53, 0x49, 0x47])).await.is_err() {
+                        break;
+                    }
+                }
+                else => break,
             }
         }
     });

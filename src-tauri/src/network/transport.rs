@@ -1530,12 +1530,19 @@ async fn run_outgoing_session(
     }
 
     // 2. Coordinate Candidate Exchange & NAT Hole-Punching via Signaling Server
-    let signaling_tx = state
-        .signaling_tx
-        .lock()
-        .unwrap()
-        .clone()
-        .ok_or_else(|| "Cannot reach peer on LAN and WAN Signaling Server is not connected".to_string())?;
+    let signaling_tx = {
+        let mut tx_opt = state.signaling_tx.lock().unwrap().clone();
+        if tx_opt.is_none() {
+            for _ in 0..10 {
+                tokio::time::sleep(Duration::from_millis(200)).await;
+                tx_opt = state.signaling_tx.lock().unwrap().clone();
+                if tx_opt.is_some() {
+                    break;
+                }
+            }
+        }
+        tx_opt.ok_or_else(|| "Cannot reach peer on LAN and WAN Signaling Server is not connected".to_string())?
+    };
 
     let stun_addr = state.settings.lock().unwrap().stun_addr.clone();
     let my_wan = state.wan_reflexive_addr.lock().unwrap().clone();
