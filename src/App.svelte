@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onMount, onDestroy } from "svelte";
   import { get } from "svelte/store";
   import { getCurrentWindow, UserAttentionType } from "@tauri-apps/api/window";
   import { getCurrentWebview } from "@tauri-apps/api/webview";
@@ -69,7 +69,56 @@
     }
   }
 
+  let statusSyncTimer: any = null;
+
+  onDestroy(() => {
+    if (statusSyncTimer) {
+      clearInterval(statusSyncTimer);
+    }
+  });
+
   onMount(async () => {
+    // 1. Immediately subscribe to all real-time backend events FIRST to prevent startup race conditions
+    await raydropApi.listenEvent<boolean>(
+      "signaling_status_changed",
+      async (connected) => {
+        networkInfo.update((n) => ({ ...n, signalingConnected: connected }));
+        if (connected && $appSettings.auth_token) {
+          await refreshCloudState(
+            $appSettings.signaling_url,
+            $appSettings.auth_token,
+          );
+        }
+      },
+    );
+
+    await raydropApi.listenEvent("peer_discovered", async () => {
+      contacts.set(await raydropApi.getContacts());
+    });
+
+    await raydropApi.listenEvent("contacts_updated", async () => {
+      contacts.set(await raydropApi.getContacts());
+    });
+
+    await raydropApi.listenEvent("cloud_state_changed", async () => {
+      await refreshCloudState(
+        $appSettings.signaling_url,
+        $appSettings.auth_token,
+      );
+    });
+
+    await raydropApi.listenEvent<boolean>(
+      "discoverability_changed",
+      (enabled) => {
+        appSettings.update((s) => ({ ...s, discoverable: enabled }));
+      },
+    );
+
+    await raydropApi.listenEvent<boolean>("autostart_changed", (enabled) => {
+      appSettings.update((s) => ({ ...s, autostart: enabled }));
+    });
+
+    // 2. Fetch fresh app state & populate stores
     const snap = await raydropApi.getAppState();
     appSettings.set(snap.settings);
     deviceCryptoMeta.set({
@@ -82,6 +131,7 @@
       wanReflexiveAddr: snap.wan_reflexive_addr,
       signalingConnected: snap.signaling_connected,
     });
+
     if (snap.queued_cli_files.length > 0) {
       cliQueuedFiles.set(snap.queued_cli_files);
       try {
@@ -112,45 +162,17 @@
       );
     }
 
-    // Subscribe to real-time backend events
-    await raydropApi.listenEvent("peer_discovered", async () => {
-      contacts.set(await raydropApi.getContacts());
-    });
-
-    await raydropApi.listenEvent("contacts_updated", async () => {
-      contacts.set(await raydropApi.getContacts());
-    });
-
-    await raydropApi.listenEvent("cloud_state_changed", async () => {
-      await refreshCloudState(
-        $appSettings.signaling_url,
-        $appSettings.auth_token,
-      );
-    });
-
-    await raydropApi.listenEvent<boolean>(
-      "discoverability_changed",
-      (enabled) => {
-        appSettings.update((s) => ({ ...s, discoverable: enabled }));
-      },
-    );
-
-    await raydropApi.listenEvent<boolean>("autostart_changed", (enabled) => {
-      appSettings.update((s) => ({ ...s, autostart: enabled }));
-    });
-
-    await raydropApi.listenEvent<boolean>(
-      "signaling_status_changed",
-      async (connected) => {
-        networkInfo.update((n) => ({ ...n, signalingConnected: connected }));
-        if (connected && $appSettings.auth_token) {
-          await refreshCloudState(
-            $appSettings.signaling_url,
-            $appSettings.auth_token,
-          );
-        }
-      },
-    );
+    // 3. Periodic synchronization timer (every 4s) to ensure signaling & network status never get stuck
+    statusSyncTimer = setInterval(async () => {
+      try {
+        const fresh = await raydropApi.getAppState();
+        networkInfo.update((n) => ({
+          ...n,
+          signalingConnected: fresh.signaling_connected,
+          wanReflexiveAddr: fresh.wan_reflexive_addr || n.wanReflexiveAddr,
+        }));
+      } catch (_) {}
+    }, 4000);
 
     await raydropApi.listenEvent<IncomingTransferEvent>(
       "incoming_transfer_request",

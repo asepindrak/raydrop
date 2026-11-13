@@ -139,6 +139,7 @@ $bodyText = @"
 - **Windows Setup Installer (`.msi`):** \`Raydrop_${ver}_x64_en-US.msi\`
 
 ### Features & Highlights
+- **Realtime WAN Signaling & STUN Connection Status Sync:** Eliminated startup race conditions where `signaling_status_changed` was emitted before frontend listeners were mounted, leaving the header stuck in "Standby". Added immediate listener pre-registration, delayed re-emit on daemon connect, and periodic 4s heartbeat state synchronization.
 - **System Tray Live Unread Chat Badge:** The Windows system tray icon now dynamically renders a live badge showing the exact number of unread chat messages with high-contrast indicator, matching bitmap font digits (`1`..`9`, `9+`), and informative tooltips.
 - **Dual-Path Instant Chat (LAN + Tailscale + WAN Relay):** Chat messages are now transmitted via direct local TCP if the peer is reachable on the local network or Tailscale mesh, with seamless fallback to encrypted WAN relay tunnel.
 - **Fixed Realtime In-Chat Auto-Scroll & Visibility:** Resolved an issue where incoming chat messages did not trigger viewport auto-scroll and remained hidden below the fold. Switching to the chat tab now immediately focuses latest messages and marks them as read.

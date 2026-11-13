@@ -42,6 +42,13 @@ pub fn start_signaling_daemon(app: AppHandle, state: Arc<AppState>) {
                     state.signaling_connected.store(true, Ordering::Relaxed);
                     let _ = app.emit("signaling_status_changed", true);
 
+                    // Re-emit status after brief delay to ensure frontend webview catches it even on cold boot
+                    let app_delayed = app.clone();
+                    tauri::async_runtime::spawn(async move {
+                        tokio::time::sleep(Duration::from_millis(1500)).await;
+                        let _ = app_delayed.emit("signaling_status_changed", true);
+                    });
+
                     let (mut ws_tx, mut ws_rx) = ws_stream.split();
                     let (tx, mut rx) = mpsc::unbounded_channel::<String>();
                     *state.signaling_tx.lock().unwrap() = Some(tx.clone());
