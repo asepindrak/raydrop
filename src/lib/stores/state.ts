@@ -14,6 +14,7 @@ export const appSettings = writable<AppSettings>({
   user_name: null,
   auth_token: null,
   discoverable: true,
+  autostart: true,
   download_dir: '',
   signaling_url: 'wss://raydrop.gapleh.online/ws',
   stun_addr: 'raydrop.gapleh.online:3478',

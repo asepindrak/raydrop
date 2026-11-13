@@ -80,3 +80,33 @@ pub fn register_windows_context_menu() -> Result<String, String> {
 pub fn register_windows_context_menu() -> Result<String, String> {
     Err("Windows Registry integration is only available on Windows.".to_string())
 }
+
+#[cfg(target_os = "windows")]
+pub fn set_windows_autostart(enabled: bool) -> Result<String, String> {
+    use std::env;
+    use winreg::enums::*;
+    use winreg::RegKey;
+
+    let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+    let (run_key, _) = hkcu
+        .create_subkey(r"Software\Microsoft\Windows\CurrentVersion\Run")
+        .map_err(|e| e.to_string())?;
+
+    if enabled {
+        let exe_path = env::current_exe().map_err(|e| e.to_string())?;
+        let exe_str = exe_path.to_string_lossy().to_string();
+        let startup_cmd = format!("\"{}\" --minimized", exe_str);
+        run_key
+            .set_value("Raydrop", &startup_cmd)
+            .map_err(|e| e.to_string())?;
+        Ok("Windows Autorun at Startup enabled (starts minimized in System Tray).".to_string())
+    } else {
+        let _ = run_key.delete_value("Raydrop");
+        Ok("Windows Autorun at Startup disabled.".to_string())
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+pub fn set_windows_autostart(_enabled: bool) -> Result<String, String> {
+    Err("Windows Registry autostart is only available on Windows.".to_string())
+}

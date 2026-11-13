@@ -9,6 +9,7 @@ export interface AppSettings {
   user_name: string | null;
   auth_token: string | null;
   discoverable: boolean;
+  autostart: boolean;
   download_dir: string;
   signaling_url: string;
   stun_addr: string;
@@ -148,11 +149,14 @@ export const raydropApi = {
     invoke<void>('delete_local_contact', params),
   toggleDiscoverability: (enabled: boolean) =>
     invoke<boolean>('toggle_discoverability', { enabled }),
+  toggleAutostart: (enabled: boolean) =>
+    invoke<boolean>('toggle_autostart', { enabled }),
   updateSettings: (params: {
     aliasName: string;
     downloadDir: string;
     signalingUrl: string;
     stunAddr: string;
+    autostart?: boolean;
   }) => invoke<AppSettings>('update_settings', params),
   getContacts: () => invoke<Contact[]>('get_contacts'),
   addWanContact: (params: {

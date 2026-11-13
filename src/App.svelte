@@ -91,6 +91,10 @@
       appSettings.update((s) => ({ ...s, discoverable: enabled }));
     });
 
+    await raydropApi.listenEvent<boolean>('autostart_changed', (enabled) => {
+      appSettings.update((s) => ({ ...s, autostart: enabled }));
+    });
+
     await raydropApi.listenEvent<boolean>('signaling_status_changed', async (connected) => {
       networkInfo.update((n) => ({ ...n, signalingConnected: connected }));
       if (connected && $appSettings.auth_token) {

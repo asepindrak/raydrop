@@ -56,6 +56,8 @@ pub fn run() {
 
     let initial_args: Vec<String> = std::env::args().collect();
     let initial_send_paths = extract_send_paths(&initial_args);
+    let start_minimized =
+        initial_args.iter().any(|a| a == "--minimized") && initial_send_paths.is_empty();
 
     let app_state = Arc::new(AppState {
         db: Arc::new(db),
@@ -101,20 +103,36 @@ pub fn run() {
 
             // Build System Tray Menu
             let is_disc = state_for_setup.is_discoverable();
+            let is_autostart = state_for_setup
+                .settings
+                .lock()
+                .map(|s| s.autostart)
+                .unwrap_or(true);
             let toggle_label = if is_disc {
                 "Status: Discoverable (ON)"
             } else {
                 "Status: Hidden (OFF)"
             };
+            let autostart_label = if is_autostart {
+                "Auto-Start at Boot: ON"
+            } else {
+                "Auto-Start at Boot: OFF"
+            };
             let toggle_item =
                 MenuItem::with_id(app, "toggle_disc", toggle_label, true, None::<&str>)?;
+            let autostart_item =
+                MenuItem::with_id(app, "toggle_autostart", autostart_label, true, None::<&str>)?;
             let open_item =
                 MenuItem::with_id(app, "open_dashboard", "Open Dashboard", true, None::<&str>)?;
             let quit_item = MenuItem::with_id(app, "quit", "Quit Raydrop", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&toggle_item, &open_item, &quit_item])?;
+            let menu = Menu::with_items(
+                app,
+                &[&toggle_item, &autostart_item, &open_item, &quit_item],
+            )?;
 
             let state_tray = state_for_setup.clone();
             let toggle_item_clone = toggle_item.clone();
+            let autostart_item_clone = autostart_item.clone();
 
             let mut tray_builder = TrayIconBuilder::new()
                 .menu(&menu)
@@ -135,6 +153,28 @@ pub fn run() {
                         };
                         let _ = toggle_item_clone.set_text(new_label);
                         let _ = app_handle.emit("discoverability_changed", next);
+                    }
+                    "toggle_autostart" => {
+                        let current = state_tray
+                            .settings
+                            .lock()
+                            .map(|s| s.autostart)
+                            .unwrap_or(true);
+                        let next = !current;
+                        let _ = crate::os::set_autostart(next);
+                        let _ = state_tray
+                            .db
+                            .set_setting("autostart", if next { "true" } else { "false" });
+                        if let Ok(mut s) = state_tray.settings.lock() {
+                            s.autostart = next;
+                        }
+                        let new_label = if next {
+                            "Auto-Start at Boot: ON"
+                        } else {
+                            "Auto-Start at Boot: OFF"
+                        };
+                        let _ = autostart_item_clone.set_text(new_label);
+                        let _ = app_handle.emit("autostart_changed", next);
                     }
                     "open_dashboard" => {
                         if let Some(w) = app_handle.get_webview_window("main") {
@@ -177,16 +217,28 @@ pub fn run() {
                 Err(e) => info!("OS Context Menu registration skipped: {e}"),
             }
 
-            // Show & focus main window on startup, set window icon, and minimize to System Tray on close
+            // Ensure OS Autorun at Startup matches user preference (points to current_exe)
+            if is_autostart {
+                match crate::os::set_autostart(true) {
+                    Ok(msg) => info!("{msg}"),
+                    Err(e) => info!("OS Autostart registration skipped: {e}"),
+                }
+            }
+
+            // Show & focus main window on startup (unless launched with --minimized at boot)
             if let Some(main_win) = app.get_webview_window("main") {
                 if let Ok(win_img) =
                     tauri::image::Image::from_bytes(include_bytes!("../icons/128x128.png"))
                 {
                     let _ = main_win.set_icon(win_img);
                 }
-                let _ = main_win.show();
-                let _ = main_win.unminimize();
-                let _ = main_win.set_focus();
+                if start_minimized {
+                    let _ = main_win.hide();
+                } else {
+                    let _ = main_win.show();
+                    let _ = main_win.unminimize();
+                    let _ = main_win.set_focus();
+                }
                 let win_clone = main_win.clone();
                 main_win.on_window_event(move |event| {
                     if let WindowEvent::CloseRequested { api, .. } = event {
@@ -210,6 +262,7 @@ pub fn run() {
             commands::sync_cloud_data_to_local,
             commands::delete_local_contact,
             commands::toggle_discoverability,
+            commands::toggle_autostart,
             commands::update_settings,
             commands::get_contacts,
             commands::add_wan_contact,

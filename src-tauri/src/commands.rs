@@ -1,6 +1,6 @@
 use crate::db::storage::{now_unix_secs, AppSettings, Contact, TransferRecord};
 use crate::network::transport::initiate_peer_transfer;
-use crate::os::register_context_menu;
+use crate::os::{register_context_menu, set_autostart};
 use crate::state::{AppState, IncomingRequestDecision};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -245,12 +245,27 @@ pub fn toggle_discoverability(
 }
 
 #[tauri::command]
+pub fn toggle_autostart(
+    state: State<'_, Arc<AppState>>,
+    enabled: bool,
+) -> Result<bool, String> {
+    let _ = set_autostart(enabled)?;
+    state
+        .db
+        .set_setting("autostart", if enabled { "true" } else { "false" })?;
+    let mut s = state.settings.lock().map_err(|e| e.to_string())?;
+    s.autostart = enabled;
+    Ok(enabled)
+}
+
+#[tauri::command]
 pub fn update_settings(
     state: State<'_, Arc<AppState>>,
     alias_name: String,
     download_dir: String,
     signaling_url: String,
     stun_addr: String,
+    autostart: Option<bool>,
 ) -> Result<AppSettings, String> {
     let resolved_stun = if stun_addr.trim().is_empty() {
         let host = signaling_url
@@ -280,6 +295,15 @@ pub fn update_settings(
     s.download_dir = download_dir;
     s.signaling_url = signaling_url.trim().to_string();
     s.stun_addr = resolved_stun;
+
+    if let Some(auto) = autostart {
+        let _ = set_autostart(auto);
+        state
+            .db
+            .set_setting("autostart", if auto { "true" } else { "false" })?;
+        s.autostart = auto;
+    }
+
     Ok(s.clone())
 }
 

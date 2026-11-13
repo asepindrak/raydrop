@@ -48,6 +48,7 @@ pub struct AppSettings {
     pub user_name: Option<String>,
     pub auth_token: Option<String>,
     pub discoverable: bool,
+    pub autostart: bool,
     pub download_dir: String,
     pub signaling_url: String,
     pub stun_addr: String,
@@ -164,6 +165,14 @@ impl Database {
             }
         };
 
+        let autostart = match db.get_setting("autostart")? {
+            Some(v) => v == "true",
+            None => {
+                db.set_setting("autostart", "true")?;
+                true
+            }
+        };
+
         let default_dl = UserDirs::new()
             .and_then(|u| u.download_dir().map(|p| p.to_path_buf()))
             .unwrap_or_else(|| PathBuf::from("."))
@@ -204,6 +213,7 @@ impl Database {
             user_name,
             auth_token,
             discoverable,
+            autostart,
             download_dir,
             signaling_url,
             stun_addr,

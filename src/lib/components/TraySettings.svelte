@@ -2,12 +2,20 @@
   import { open } from "@tauri-apps/plugin-dialog";
   import { appSettings, settingsModalOpen } from "../stores/state";
   import { raydropApi } from "../utils/tauri-ipc";
-  import { FolderOpen, Terminal, Save, X, CheckCircle2 } from "lucide-svelte";
+  import {
+    FolderOpen,
+    Terminal,
+    Save,
+    X,
+    CheckCircle2,
+    Power,
+  } from "lucide-svelte";
 
   let aliasName = "";
   let downloadDir = "";
   let signalingUrl = "";
   let stunAddr = "";
+  let autostart = true;
   let statusBanner = "";
 
   $: if ($settingsModalOpen) {
@@ -15,6 +23,7 @@
     downloadDir = $appSettings.download_dir;
     signalingUrl = $appSettings.signaling_url;
     stunAddr = $appSettings.stun_addr;
+    autostart = $appSettings.autostart ?? true;
   }
 
   async function browseDownloadDir() {
@@ -35,11 +44,25 @@
       downloadDir,
       signalingUrl,
       stunAddr,
+      autostart,
     });
     appSettings.set(updated);
-    statusBanner =
-      "Settings saved! Signaling client will reconnect automatically.";
+    statusBanner = "Settings saved! Autorun & Signaling configuration updated.";
     setTimeout(() => (statusBanner = ""), 3000);
+  }
+
+  async function handleToggleAutostart() {
+    try {
+      const next = !autostart;
+      autostart = await raydropApi.toggleAutostart(next);
+      appSettings.update((s) => ({ ...s, autostart }));
+      statusBanner = autostart
+        ? "Autorun at OS Startup enabled (starts minimized in System Tray)."
+        : "Autorun at OS Startup disabled.";
+      setTimeout(() => (statusBanner = ""), 3000);
+    } catch (e: any) {
+      statusBanner = `Autorun error: ${String(e)}`;
+    }
   }
 
   async function handleRegisterContextMenu() {
@@ -147,6 +170,33 @@
               class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono text-cyan-300 focus:outline-none focus:border-cyan-500"
             />
           </div>
+        </div>
+
+        <!-- Autorun at Startup Toggle -->
+        <div
+          class="p-3.5 rounded-xl bg-slate-950/90 border border-slate-800 flex items-center justify-between gap-3"
+        >
+          <div>
+            <p
+              class="text-xs font-semibold text-slate-200 flex items-center gap-1.5"
+            >
+              <Power class="w-3.5 h-3.5 text-cyan-400" />
+              <span>Autorun at OS Startup</span>
+            </p>
+            <p class="text-[11px] text-slate-400">
+              Automatically launch Raydrop minimized in the System Tray when
+              Windows, macOS, or Linux boots up.
+            </p>
+          </div>
+          <button
+            type="button"
+            on:click={handleToggleAutostart}
+            class="px-3 py-2 rounded-xl border text-xs font-semibold flex items-center gap-1.5 shrink-0 transition-all {autostart
+              ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300'
+              : 'bg-slate-800 border-slate-700 text-slate-400'}"
+          >
+            <span>{autostart ? "Enabled (ON)" : "Disabled (OFF)"}</span>
+          </button>
         </div>
 
         <!-- OS Context Menu Integration -->

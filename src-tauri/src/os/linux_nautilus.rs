@@ -35,3 +35,27 @@ pub fn register_nautilus_script() -> Result<String, String> {
     ))
 }
 
+pub fn set_linux_autostart(enabled: bool) -> Result<String, String> {
+    let home = std::env::var("HOME").map_err(|e| e.to_string())?;
+    let autostart_dir = std::path::PathBuf::from(home)
+        .join(".config")
+        .join("autostart");
+    std::fs::create_dir_all(&autostart_dir).map_err(|e| e.to_string())?;
+    let desktop_file = autostart_dir.join("raydrop.desktop");
+
+    if enabled {
+        let exe_path = std::env::current_exe()
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or_else(|_| "raydrop".to_string());
+        let content = format!(
+            "[Desktop Entry]\nType=Application\nName=Raydrop\nComment=Universal P2P File Transfer\nExec=\"{exe}\" --minimized\nTerminal=false\nX-GNOME-Autostart-enabled=true\n",
+            exe = exe_path
+        );
+        std::fs::write(&desktop_file, content).map_err(|e| e.to_string())?;
+        Ok("Linux XDG Autostart enabled.".to_string())
+    } else {
+        let _ = std::fs::remove_file(&desktop_file);
+        Ok("Linux XDG Autostart disabled.".to_string())
+    }
+}
+
