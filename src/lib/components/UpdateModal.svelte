@@ -8,6 +8,7 @@
     updateErrorMessage,
   } from '../stores/update';
   import { raydropApi, formatBytes } from '../utils/tauri-ipc';
+  import { renderMarkdown } from '../utils/markdown';
   import { open as openShell } from '@tauri-apps/plugin-shell';
   import {
     Sparkles,
@@ -53,6 +54,20 @@
       await openShell($updateInfo.html_url);
     } catch {
       window.open($updateInfo.html_url, '_blank');
+    }
+  }
+
+  async function handleContentClick(e: MouseEvent) {
+    const target = (e.target as HTMLElement)?.closest('a');
+    if (!target) return;
+    const href = target.getAttribute('href');
+    if (href && (href.startsWith('http://') || href.startsWith('https://'))) {
+      e.preventDefault();
+      try {
+        await raydropApi.openExternalUrl(href);
+      } catch {
+        window.open(href, '_blank');
+      }
     }
   }
 
@@ -150,8 +165,13 @@
             <h4 class="text-xs font-semibold text-slate-300 mb-1.5 flex items-center gap-1.5">
               <span>Release Notes</span>
             </h4>
-            <div class="p-3 rounded-xl bg-slate-950 border border-slate-800/70 text-xs text-slate-300 font-mono leading-relaxed whitespace-pre-wrap max-h-48 overflow-y-auto select-text">
-              {$updateInfo.release_notes}
+            <!-- svelte-ignore a11y-click-events-have-key-events -->
+            <!-- svelte-ignore a11y-no-static-element-interactions -->
+            <div
+              on:click={handleContentClick}
+              class="p-3.5 rounded-xl bg-slate-950 border border-slate-800/70 text-xs text-slate-300 leading-relaxed max-h-56 overflow-y-auto select-text markdown-body"
+            >
+              {@html renderMarkdown($updateInfo.release_notes)}
             </div>
           </div>
         {/if}
@@ -242,3 +262,100 @@
     </div>
   </div>
 {/if}
+
+<style>
+  :global(.markdown-body a) {
+    color: #38bdf8 !important;
+    text-decoration: underline !important;
+    cursor: pointer !important;
+  }
+  :global(.markdown-body a:hover) {
+    color: #7dd3fc !important;
+  }
+  :global(.markdown-body h1) {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #f1f5f9;
+    margin: 0.75rem 0 0.35rem 0;
+  }
+  :global(.markdown-body h2) {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #e2e8f0;
+    margin: 0.6rem 0 0.3rem 0;
+  }
+  :global(.markdown-body h3) {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #cbd5e1;
+    margin: 0.5rem 0 0.25rem 0;
+  }
+  :global(.markdown-body h4) {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #94a3b8;
+    margin: 0.4rem 0 0.2rem 0;
+  }
+  :global(.markdown-body pre) {
+    background-color: #020617 !important;
+    border: 1px solid #1e293b;
+    border-radius: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    overflow-x: auto;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 0.75rem;
+    margin: 0.4rem 0;
+  }
+  :global(.markdown-body code) {
+    background-color: rgba(15, 23, 42, 0.8);
+    border: 1px solid rgba(51, 65, 85, 0.6);
+    border-radius: 0.25rem;
+    padding: 0.1rem 0.3rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 0.75rem;
+    color: #38bdf8;
+  }
+  :global(.markdown-body p) {
+    margin-bottom: 0.4rem;
+  }
+  :global(.markdown-body p:last-child) {
+    margin-bottom: 0;
+  }
+  :global(.markdown-body ul) {
+    list-style-type: disc;
+    padding-left: 1.25rem;
+    margin: 0.35rem 0;
+  }
+  :global(.markdown-body ol) {
+    list-style-type: decimal;
+    padding-left: 1.25rem;
+    margin: 0.35rem 0;
+  }
+  :global(.markdown-body li) {
+    margin: 0.15rem 0;
+  }
+  :global(.markdown-body blockquote) {
+    border-left: 3px solid #06b6d4;
+    padding-left: 0.75rem;
+    color: #94a3b8;
+    margin: 0.35rem 0;
+  }
+  :global(.markdown-body hr) {
+    border: none;
+    border-top: 1px solid #334155;
+    margin: 0.6rem 0;
+  }
+  :global(.markdown-body table) {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 0.5rem 0;
+  }
+  :global(.markdown-body th, .markdown-body td) {
+    border: 1px solid #334155;
+    padding: 0.3rem 0.6rem;
+    text-align: left;
+  }
+  :global(.markdown-body th) {
+    background-color: rgba(15, 23, 42, 0.8);
+  }
+</style>

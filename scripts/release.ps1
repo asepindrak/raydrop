@@ -142,6 +142,8 @@ $bodyText = @"
 - **Windows Portable App (`.exe` — Standalone / No Install):** \`Raydrop_${ver}_x64-portable.exe\`
 
 ### Features & Highlights
+- **Markdown Formatted Release Notes:** In-app update notifications and release dialogs now render rich markdown styling (headings, lists, code blocks, links) with automatic external browser launching.
+- **Scrollable Settings Modal:** Redesigned Configuration/Settings dialog with bounded max-height, smooth scrollview, and pinned action bar to prevent overflow on smaller screens and laptop displays.
 - **Integrated P2P Encrypted Chat:** Real-time end-to-end encrypted messaging with contacts and peers across local LAN & remote WAN with zero server storage.
 - **Rich Markdown Formatter:** Code blocks with syntax highlighting, lists, bold/italic, tables, blockquotes, and plan checklists.
 - **In-Chat Multiple Media & File Transfer:** Send multiple images, videos, documents, PDFs, archives, and folders directly within the conversation.
