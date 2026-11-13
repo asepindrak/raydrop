@@ -36,3 +36,27 @@ pub fn set_autostart(enabled: bool) -> Result<String, String> {
     Err("Unsupported operating system for autostart".to_string())
 }
 
+pub fn get_win11_direct_menu_status() -> bool {
+    #[cfg(target_os = "windows")]
+    {
+        win_registry::is_win11_classic_menu_enabled()
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        false
+    }
+}
+
+pub fn set_win11_direct_menu(enabled: bool) -> Result<bool, String> {
+    #[cfg(target_os = "windows")]
+    {
+        win_registry::set_win11_classic_menu(enabled)
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = enabled;
+        Ok(false)
+    }
+}
+
+

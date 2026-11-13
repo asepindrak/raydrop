@@ -278,6 +278,8 @@ pub fn run() {
             commands::register_os_context_menu,
             commands::open_file_path,
             commands::open_folder_path,
+            commands::get_win11_direct_menu,
+            commands::toggle_win11_direct_menu,
             commands::check_app_update,
             commands::download_and_install_update,
         ])

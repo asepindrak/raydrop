@@ -8,3 +8,4 @@ export const updateDownloading = writable<boolean>(false);
 export const updateProgress = writable<UpdateProgressPayload | null>(null);
 export const updateStatusMessage = writable<string>('');
 export const updateErrorMessage = writable<string>('');
+

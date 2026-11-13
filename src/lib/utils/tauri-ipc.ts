@@ -210,6 +210,9 @@ export const raydropApi = {
     invoke<void>('cancel_transfer', { sessionId }),
   getTransferHistory: () => invoke<TransferRecord[]>('get_transfer_history'),
   registerOsContextMenu: () => invoke<string>('register_os_context_menu'),
+  getWin11DirectMenu: () => invoke<boolean>('get_win11_direct_menu'),
+  toggleWin11DirectMenu: (enabled: boolean) =>
+    invoke<boolean>('toggle_win11_direct_menu', { enabled }),
   openFilePath: (path: string) => invoke<void>('open_file_path', { path }),
   openFolderPath: (path: string) => invoke<void>('open_folder_path', { path }),
   checkAppUpdate: () => invoke<UpdateCheckResult>('check_app_update'),

@@ -479,6 +479,16 @@ pub fn register_os_context_menu() -> Result<String, String> {
     register_context_menu()
 }
 
+#[tauri::command]
+pub fn get_win11_direct_menu() -> bool {
+    crate::os::get_win11_direct_menu_status()
+}
+
+#[tauri::command]
+pub fn toggle_win11_direct_menu(enabled: bool) -> Result<bool, String> {
+    crate::os::set_win11_direct_menu(enabled)
+}
+
 #[cfg(target_os = "windows")]
 mod win_shell {
     use std::ffi::OsStr;

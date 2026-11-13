@@ -1,6 +1,6 @@
 [package]
 name = "raydrop"
-version = "1.0.8"
+version = "1.0.9"
 description = "Universal Zero-Server P2P File Transfer System (LAN + WAN)"
 authors = ["Raydrop Team"]
 edition = "2021"

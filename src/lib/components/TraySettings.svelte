@@ -20,6 +20,7 @@
   let signalingUrl = "";
   let stunAddr = "";
   let autostart = true;
+  let win11DirectMenu = false;
   let statusBanner = "";
 
   $: if ($settingsModalOpen) {
@@ -28,6 +29,7 @@
     signalingUrl = $appSettings.signaling_url;
     stunAddr = $appSettings.stun_addr;
     autostart = $appSettings.autostart ?? true;
+    raydropApi.getWin11DirectMenu().then((res) => (win11DirectMenu = res)).catch(() => {});
   }
 
   async function browseDownloadDir() {
@@ -75,6 +77,19 @@
       statusBanner = msg;
     } catch (e: any) {
       statusBanner = `Context menu error: ${String(e)}`;
+    }
+  }
+
+  async function handleToggleWin11DirectMenu() {
+    try {
+      const next = !win11DirectMenu;
+      win11DirectMenu = await raydropApi.toggleWin11DirectMenu(next);
+      statusBanner = win11DirectMenu
+        ? "Direct Right-Click enabled! Explorer refreshed. Raydrop now shows on normal right-click."
+        : "Windows 11 modern context menu restored.";
+      setTimeout(() => (statusBanner = ""), 4500);
+    } catch (e: any) {
+      statusBanner = `Windows 11 menu error: ${String(e)}`;
     }
   }
 </script>
@@ -225,6 +240,35 @@
           </button>
         </div>
 
+        <!-- Windows 11 Direct Right-Click Bypass -->
+        <div
+          class="p-3.5 rounded-xl bg-slate-950/90 border border-slate-800 flex items-center justify-between gap-3"
+        >
+          <div>
+            <div class="flex items-center gap-2">
+              <p class="text-xs font-semibold text-slate-200">
+                Windows 11 Direct Right-Click
+              </p>
+              <span class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-300 border border-cyan-500/20">
+                No Shift Needed
+              </span>
+            </div>
+            <p class="text-[11px] text-slate-400 mt-0.5">
+              Bypasses Windows 11's collapsed "Show more options" so "Send with Raydrop"
+              appears immediately on normal right-click.
+            </p>
+          </div>
+          <button
+            type="button"
+            on:click={handleToggleWin11DirectMenu}
+            class="px-3 py-2 rounded-xl border text-xs font-semibold flex items-center gap-1.5 shrink-0 transition-all {win11DirectMenu
+              ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300 shadow-sm shadow-emerald-500/10'
+              : 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-400 hover:text-white'}"
+          >
+            <span>{win11DirectMenu ? "Enabled (Direct)" : "Disabled (Default Win 11)"}</span>
+          </button>
+        </div>
+
         <!-- Software Updates -->
         <div
           class="p-3.5 rounded-xl bg-slate-950/90 border border-slate-800 flex items-center justify-between gap-3"
@@ -233,7 +277,7 @@
             <div class="flex items-center gap-2">
               <p class="text-xs font-semibold text-slate-200">Software Updates</p>
               <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
-                Current: v1.0.8
+                Current: v1.0.9
               </span>
             </div>
             <p class="text-[11px] text-slate-400 mt-0.5">

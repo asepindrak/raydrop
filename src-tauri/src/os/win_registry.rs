@@ -110,3 +110,52 @@ pub fn set_windows_autostart(enabled: bool) -> Result<String, String> {
 pub fn set_windows_autostart(_enabled: bool) -> Result<String, String> {
     Err("Windows Registry autostart is only available on Windows.".to_string())
 }
+
+#[cfg(target_os = "windows")]
+pub fn is_win11_classic_menu_enabled() -> bool {
+    use winreg::enums::*;
+    use winreg::RegKey;
+
+    let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+    hkcu.open_subkey(r"Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}\InprocServer32")
+        .is_ok()
+}
+
+#[cfg(target_os = "windows")]
+pub fn set_win11_classic_menu(enabled: bool) -> Result<bool, String> {
+    use std::os::windows::process::CommandExt;
+    use winreg::enums::*;
+    use winreg::RegKey;
+
+    let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+    let clsid_root = r"Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}";
+
+    if enabled {
+        let (inproc, _) = hkcu
+            .create_subkey(&format!(r"{}\InprocServer32", clsid_root))
+            .map_err(|e| e.to_string())?;
+        inproc.set_value("", &"").map_err(|e| e.to_string())?;
+    } else {
+        let _ = hkcu.delete_subkey_all(clsid_root);
+    }
+
+    // Refresh Windows File Explorer seamlessly without command prompt flicker
+    const CREATE_NO_WINDOW: u32 = 0x08000000;
+    let _ = std::process::Command::new("cmd.exe")
+        .args(["/c", "taskkill /f /im explorer.exe & start explorer.exe"])
+        .creation_flags(CREATE_NO_WINDOW)
+        .spawn();
+
+    Ok(enabled)
+}
+
+#[cfg(not(target_os = "windows"))]
+pub fn is_win11_classic_menu_enabled() -> bool {
+    false
+}
+
+#[cfg(not(target_os = "windows"))]
+pub fn set_win11_classic_menu(_enabled: bool) -> Result<bool, String> {
+    Ok(false)
+}
+

@@ -59,3 +59,4 @@ export async function checkForUpdates(manual: boolean = false): Promise<boolean>
     updateChecking.set(false);
   }
 }
+
