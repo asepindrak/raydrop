@@ -87,7 +87,7 @@
     <div class="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl">
       <div class="flex items-center justify-between pb-4 border-b border-slate-800">
         <div class="flex items-center gap-3">
-          <img src="/logo.png" alt="Raydrop" class="w-9 h-9 rounded-xl" />
+          <img src="/logo.png" alt="Raydrop" class="w-12 h-12 object-contain rounded-xl bg-slate-950/60 p-1 border border-slate-800" />
           <div>
             <h3 class="text-base font-bold text-white">
               {mode === 'login' ? 'Sign In to Raydrop Mesh' : 'Create Raydrop Account'}

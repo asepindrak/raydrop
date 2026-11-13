@@ -1,4 +1,12 @@
-# Raydrop — Universal P2P File Transfer (LAN + Direct WAN)
+<p align="center">
+  <img src="assets/logo.png" alt="Raydrop Logo" width="200" />
+</p>
+
+<h1 align="center">Raydrop</h1>
+<p align="center">
+  <strong>Universal P2P File Transfer (LAN + Direct WAN)</strong><br />
+  Fast, Encrypted, Multi-Segment Parallel File Sharing Across Devices
+</p>
 
 Raydrop is a zero-server-storage P2P file transfer desktop application for **Windows, macOS, and Linux** built with **Tauri v2 (Rust + Svelte + Tailwind CSS)**.
 
