@@ -1,6 +1,8 @@
 <script lang="ts">
   import { open } from "@tauri-apps/plugin-dialog";
   import { appSettings, settingsModalOpen } from "../stores/state";
+  import { updateInfo, updateModalOpen, updateChecking, updateStatusMessage } from "../stores/update";
+  import { checkForUpdates } from "../utils/updater";
   import { raydropApi } from "../utils/tauri-ipc";
   import {
     FolderOpen,
@@ -9,6 +11,8 @@
     X,
     CheckCircle2,
     Power,
+    RefreshCw,
+    Sparkles,
   } from "lucide-svelte";
 
   let aliasName = "";
@@ -218,6 +222,54 @@
           >
             <Terminal class="w-3.5 h-3.5" />
             <span>Register Menu</span>
+          </button>
+        </div>
+
+        <!-- Software Updates -->
+        <div
+          class="p-3.5 rounded-xl bg-slate-950/90 border border-slate-800 flex items-center justify-between gap-3"
+        >
+          <div>
+            <div class="flex items-center gap-2">
+              <p class="text-xs font-semibold text-slate-200">Software Updates</p>
+              <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
+                Current: v1.0.8
+              </span>
+            </div>
+            <p class="text-[11px] text-slate-400 mt-0.5">
+              {#if $updateInfo?.has_update}
+                <span class="text-cyan-300 font-medium">New release {$updateInfo.latest_version} available!</span>
+              {:else if $updateStatusMessage}
+                <span class="text-emerald-400">{$updateStatusMessage}</span>
+              {:else}
+                Check for updates and automatically upgrade to latest release.
+              {/if}
+            </p>
+          </div>
+          <button
+            type="button"
+            on:click={() => {
+              if ($updateInfo?.has_update) {
+                updateModalOpen.set(true);
+              } else {
+                checkForUpdates(true);
+              }
+            }}
+            disabled={$updateChecking}
+            class="px-3 py-2 rounded-xl border text-xs font-semibold flex items-center gap-1.5 shrink-0 transition-all {$updateInfo?.has_update
+              ? 'bg-cyan-500 hover:bg-cyan-400 text-slate-950 border-cyan-400 shadow-md shadow-cyan-500/20'
+              : 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-300'}"
+          >
+            {#if $updateChecking}
+              <RefreshCw class="w-3.5 h-3.5 animate-spin text-cyan-400" />
+              <span>Checking...</span>
+            {:else if $updateInfo?.has_update}
+              <Sparkles class="w-3.5 h-3.5" />
+              <span>View Update</span>
+            {:else}
+              <RefreshCw class="w-3.5 h-3.5" />
+              <span>Check Updates</span>
+            {/if}
           </button>
         </div>
 

@@ -1,6 +1,6 @@
 [package]
 name = "raydrop"
-version = "1.0.7"
+version = "1.0.8"
 description = "Universal Zero-Server P2P File Transfer System (LAN + WAN)"
 authors = ["Raydrop Team"]
 edition = "2021"
@@ -46,6 +46,7 @@ tracing-subscriber = "0.3"
 directories = "5.0"
 walkdir = "2.5"
 local-ip-address = "0.6"
+reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "rustls-tls"] }
 
 [target.'cfg(target_os = "windows")'.dependencies]
 winreg = "0.52"

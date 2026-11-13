@@ -132,6 +132,26 @@ export function getApiBaseUrl(signalingUrl: string): string {
     .replace(/\/ws\/?$/i, '');
 }
 
+export interface UpdateCheckResult {
+  has_update: boolean;
+  current_version: string;
+  latest_version: string;
+  release_title: string;
+  release_notes: string;
+  release_date: string;
+  html_url: string;
+  download_url: string | null;
+  asset_name: string | null;
+  asset_size: number | null;
+}
+
+export interface UpdateProgressPayload {
+  downloaded: number;
+  total: number;
+  percent: number;
+  speed_bytes_sec: number;
+}
+
 export const raydropApi = {
   getAppState: () => invoke<AppStateSnapshot>('get_app_state'),
   saveCloudSession: (params: {
@@ -192,6 +212,9 @@ export const raydropApi = {
   registerOsContextMenu: () => invoke<string>('register_os_context_menu'),
   openFilePath: (path: string) => invoke<void>('open_file_path', { path }),
   openFolderPath: (path: string) => invoke<void>('open_folder_path', { path }),
+  checkAppUpdate: () => invoke<UpdateCheckResult>('check_app_update'),
+  downloadAndInstallUpdate: (downloadUrl: string, assetName: string) =>
+    invoke<string>('download_and_install_update', { downloadUrl, assetName }),
   listenEvent: <T>(event: string, handler: (payload: T) => void): Promise<UnlistenFn> =>
     listen<T>(event, (e) => handler(e.payload)),
 };

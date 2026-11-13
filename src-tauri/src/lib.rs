@@ -278,6 +278,8 @@ pub fn run() {
             commands::register_os_context_menu,
             commands::open_file_path,
             commands::open_folder_path,
+            commands::check_app_update,
+            commands::download_and_install_update,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Raydrop Tauri application");

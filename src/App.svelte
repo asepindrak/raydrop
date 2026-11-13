@@ -7,6 +7,7 @@
   import TransferModal from './lib/components/TransferModal.svelte';
   import TraySettings from './lib/components/TraySettings.svelte';
   import AuthModal from './lib/components/AuthModal.svelte';
+  import UpdateModal from './lib/components/UpdateModal.svelte';
   import {
     appSettings,
     deviceCryptoMeta,
@@ -23,6 +24,8 @@
     applyTransferProgress,
     upsertTransferRecord,
   } from './lib/stores/transfers';
+  import { updateProgress } from './lib/stores/update';
+  import { checkForUpdates } from './lib/utils/updater';
   import {
     raydropApi,
     cloudApi,
@@ -30,6 +33,7 @@
     type IncomingTransferEvent,
     type TransferProgressEvent,
     type TransferRecord,
+    type UpdateProgressPayload,
   } from './lib/utils/tauri-ipc';
 
   async function refreshCloudState(sigUrl: string, token: string | null) {
@@ -166,6 +170,15 @@
         console.warn('Window focus error on cli send:', err);
       }
     });
+
+    await raydropApi.listenEvent<UpdateProgressPayload>('app_update_progress', (payload) => {
+      updateProgress.set(payload);
+    });
+
+    // Auto-check for software updates silently on startup after brief initialization
+    setTimeout(() => {
+      checkForUpdates(false).catch(() => {});
+    }, 2500);
   });
 </script>
 
@@ -184,4 +197,5 @@
   <TransferModal />
   <TraySettings />
   <AuthModal />
+  <UpdateModal />
 </div>

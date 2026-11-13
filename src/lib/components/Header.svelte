@@ -8,7 +8,9 @@
     cloudContacts,
   } from '../stores/state';
   import { raydropApi } from '../utils/tauri-ipc';
-  import { Copy, Check, Globe, Wifi, Settings, LogIn, LogOut, Mail } from 'lucide-svelte';
+  import { updateInfo, updateModalOpen, updateChecking } from '../stores/update';
+  import { checkForUpdates } from '../utils/updater';
+  import { Copy, Check, Globe, Wifi, Settings, LogIn, LogOut, Mail, Sparkles, RefreshCw } from 'lucide-svelte';
 
   let copied = false;
 
@@ -44,9 +46,29 @@
     <div>
       <div class="flex items-center gap-2.5">
         <h1 class="text-lg font-bold tracking-tight text-white">Raydrop</h1>
-        <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
-          v1.0.7
-        </span>
+        <button
+          type="button"
+          on:click={() => checkForUpdates(true)}
+          class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white border border-slate-700 transition-colors flex items-center gap-1 cursor-pointer"
+          title="Click to check for software updates"
+        >
+          {#if $updateChecking}
+            <RefreshCw class="w-2.5 h-2.5 animate-spin text-cyan-400" />
+          {/if}
+          <span>v1.0.8</span>
+        </button>
+
+        {#if $updateInfo?.has_update}
+          <button
+            type="button"
+            on:click={() => updateModalOpen.set(true)}
+            class="flex items-center gap-1 text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 shadow-sm shadow-cyan-500/20 animate-pulse transition-all cursor-pointer"
+            title="Click to view update details and install"
+          >
+            <Sparkles class="w-3 h-3 text-cyan-400" />
+            <span>Update {$updateInfo.latest_version}</span>
+          </button>
+        {/if}
         {#if $appSettings.user_name}
           <span class="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
             {$appSettings.user_name}

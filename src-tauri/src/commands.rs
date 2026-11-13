@@ -707,3 +707,252 @@ pub fn open_folder_path(app: AppHandle, path: String) -> Result<(), String> {
 
     Ok(())
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UpdateCheckResult {
+    pub has_update: bool,
+    pub current_version: String,
+    pub latest_version: String,
+    pub release_title: String,
+    pub release_notes: String,
+    pub release_date: String,
+    pub html_url: String,
+    pub download_url: Option<String>,
+    pub asset_name: Option<String>,
+    pub asset_size: Option<u64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UpdateProgressPayload {
+    pub downloaded: u64,
+    pub total: u64,
+    pub percent: f64,
+    pub speed_bytes_sec: u64,
+}
+
+fn parse_semver(v: &str) -> Vec<u64> {
+    let clean = v.trim_start_matches('v').trim_start_matches('V');
+    clean
+        .split(|c: char| c == '.' || c == '-' || c == '+')
+        .filter_map(|s| s.parse::<u64>().ok())
+        .collect()
+}
+
+fn is_newer_version(latest: &str, current: &str) -> bool {
+    let l_parts = parse_semver(latest);
+    let c_parts = parse_semver(current);
+    let max_len = l_parts.len().max(c_parts.len());
+    for i in 0..max_len {
+        let l = l_parts.get(i).copied().unwrap_or(0);
+        let c = c_parts.get(i).copied().unwrap_or(0);
+        if l > c {
+            return true;
+        } else if l < c {
+            return false;
+        }
+    }
+    false
+}
+
+#[tauri::command]
+pub async fn check_app_update(app: AppHandle) -> Result<UpdateCheckResult, String> {
+    let current_version = app.package_info().version.to_string();
+
+    let client = reqwest::Client::builder()
+        .user_agent("Raydrop-Desktop-App")
+        .timeout(std::time::Duration::from_secs(12))
+        .build()
+        .map_err(|e| format!("Failed to create HTTP client: {e}"))?;
+
+    let res = client
+        .get("https://api.github.com/repos/asepindrak/raydrop/releases/latest")
+        .send()
+        .await
+        .map_err(|e| format!("Unable to reach GitHub update server: {e}"))?;
+
+    if !res.status().is_success() {
+        return Err(format!("Update check returned HTTP {}", res.status()));
+    }
+
+    let release_val: serde_json::Value = res
+        .json()
+        .await
+        .map_err(|e| format!("Failed to parse release response: {e}"))?;
+
+    let tag_name = release_val["tag_name"]
+        .as_str()
+        .unwrap_or("")
+        .to_string();
+    let release_title = release_val["name"]
+        .as_str()
+        .unwrap_or(&tag_name)
+        .to_string();
+    let release_notes = release_val["body"]
+        .as_str()
+        .unwrap_or("")
+        .to_string();
+    let release_date = release_val["published_at"]
+        .as_str()
+        .unwrap_or("")
+        .to_string();
+    let html_url = release_val["html_url"]
+        .as_str()
+        .unwrap_or("https://github.com/asepindrak/raydrop/releases")
+        .to_string();
+
+    let clean_latest = tag_name.trim_start_matches('v').trim_start_matches('V').to_string();
+    let has_update = is_newer_version(&clean_latest, &current_version);
+
+    let mut download_url = None;
+    let mut asset_name = None;
+    let mut asset_size = None;
+
+    if let Some(assets) = release_val["assets"].as_array() {
+        // Priority 1: .msi installer
+        let msi_asset = assets.iter().find(|a| {
+            a["name"]
+                .as_str()
+                .map(|n| n.to_lowercase().ends_with(".msi"))
+                .unwrap_or(false)
+        });
+
+        // Priority 2: .exe
+        let exe_asset = assets.iter().find(|a| {
+            a["name"]
+                .as_str()
+                .map(|n| n.to_lowercase().ends_with(".exe"))
+                .unwrap_or(false)
+        });
+
+        let target_asset = msi_asset.or(exe_asset);
+        if let Some(a) = target_asset {
+            download_url = a["browser_download_url"].as_str().map(String::from);
+            asset_name = a["name"].as_str().map(String::from);
+            asset_size = a["size"].as_u64();
+        }
+    }
+
+    Ok(UpdateCheckResult {
+        has_update,
+        current_version,
+        latest_version: tag_name,
+        release_title,
+        release_notes,
+        release_date,
+        html_url,
+        download_url,
+        asset_name,
+        asset_size,
+    })
+}
+
+#[tauri::command]
+pub async fn download_and_install_update(
+    app: AppHandle,
+    download_url: String,
+    asset_name: String,
+) -> Result<String, String> {
+    use futures_util::StreamExt;
+    use tokio::io::AsyncWriteExt;
+
+    let client = reqwest::Client::builder()
+        .user_agent("Raydrop-Desktop-App")
+        .build()
+        .map_err(|e| format!("Failed to create download client: {e}"))?;
+
+    let res = client
+        .get(&download_url)
+        .send()
+        .await
+        .map_err(|e| format!("Failed to initiate download: {e}"))?;
+
+    if !res.status().is_success() {
+        return Err(format!("Download failed with HTTP {}", res.status()));
+    }
+
+    let total_bytes = res.content_length().unwrap_or(0);
+    let temp_file_path = std::env::temp_dir().join(&asset_name);
+
+    let mut file = tokio::fs::File::create(&temp_file_path)
+        .await
+        .map_err(|e| format!("Failed to create temporary file: {e}"))?;
+
+    let mut stream = res.bytes_stream();
+    let mut downloaded: u64 = 0;
+    let mut last_emit = std::time::Instant::now();
+    let mut last_bytes: u64 = 0;
+
+    while let Some(chunk_res) = stream.next().await {
+        let chunk = chunk_res.map_err(|e| format!("Error downloading chunk: {e}"))?;
+        file.write_all(&chunk)
+            .await
+            .map_err(|e| format!("Failed to write chunk to disk: {e}"))?;
+        downloaded += chunk.len() as u64;
+
+        if last_emit.elapsed() >= std::time::Duration::from_millis(150) || downloaded == total_bytes {
+            let elapsed_sec = last_emit.elapsed().as_secs_f64();
+            let speed = if elapsed_sec > 0.0 {
+                ((downloaded.saturating_sub(last_bytes)) as f64 / elapsed_sec) as u64
+            } else {
+                0
+            };
+            last_bytes = downloaded;
+            last_emit = std::time::Instant::now();
+
+            let percent = if total_bytes > 0 {
+                (downloaded as f64 / total_bytes as f64) * 100.0
+            } else {
+                0.0
+            };
+
+            let _ = app.emit(
+                "app_update_progress",
+                UpdateProgressPayload {
+                    downloaded,
+                    total: total_bytes,
+                    percent,
+                    speed_bytes_sec: speed,
+                },
+            );
+        }
+    }
+
+    file.flush()
+        .await
+        .map_err(|e| format!("Failed to flush downloaded file: {e}"))?;
+    drop(file);
+
+    #[cfg(target_os = "windows")]
+    {
+        let is_msi = asset_name.to_lowercase().ends_with(".msi");
+        let path_str = temp_file_path.to_string_lossy().to_string();
+
+        if is_msi {
+            std::process::Command::new("msiexec.exe")
+                .arg("/i")
+                .arg(&path_str)
+                .spawn()
+                .map_err(|e| format!("Failed to launch MSI installer: {e}"))?;
+
+            let app_exit = app.clone();
+            tokio::spawn(async move {
+                tokio::time::sleep(tokio::time::Duration::from_millis(1500)).await;
+                app_exit.exit(0);
+            });
+
+            return Ok("Installer launched. Upgrading Raydrop...".to_string());
+        } else {
+            std::process::Command::new("explorer.exe")
+                .arg(format!("/select,{}", path_str))
+                .spawn()
+                .ok();
+            return Ok(format!("Updated executable saved to {}", path_str));
+        }
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        return Ok(format!("Downloaded update to {}", temp_file_path.to_string_lossy()));
+    }
+}
+
