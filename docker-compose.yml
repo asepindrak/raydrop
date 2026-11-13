@@ -43,7 +43,10 @@ services:
     container_name: raydrop-landing
     restart: unless-stopped
     ports:
-      - "${LANDING_PORT:-3000}:80"
+      # Port 3000 biasanya sudah dipakai oleh dashboard Dokploy.
+      # Gunakan port 3080 (atau ubah via env LANDING_PORT).
+      # Jika hanya diakses via domain Traefik (raydrop.web.id), baris ports ini bahkan bisa dihapus/dikomentari.
+      - "${LANDING_PORT:-3080}:80"
     networks:
       - dokploy-network
     labels:
