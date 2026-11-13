@@ -6,11 +6,29 @@
     authModalOpen,
     cloudMyDevices,
     cloudContacts,
+    activeMainTab,
   } from '../stores/state';
+  import { contacts, lanContacts } from '../stores/contacts';
+  import { activeTransfers } from '../stores/transfers';
   import { raydropApi } from '../utils/tauri-ipc';
   import { updateInfo, updateModalOpen, updateChecking } from '../stores/update';
   import { checkForUpdates } from '../utils/updater';
-  import { Copy, Check, Globe, Wifi, Settings, LogIn, LogOut, Mail, Sparkles, RefreshCw } from 'lucide-svelte';
+  import {
+    Copy,
+    Check,
+    Globe,
+    Wifi,
+    Settings,
+    LogIn,
+    LogOut,
+    Mail,
+    Sparkles,
+    RefreshCw,
+    Activity,
+    Laptop,
+    Users,
+    Zap,
+  } from 'lucide-svelte';
 
   let copied = false;
 
@@ -35,17 +53,17 @@
   }
 </script>
 
-<header class="border-b border-slate-800/80 bg-slate-900/70 backdrop-blur-md px-6 py-3.5 flex items-center justify-between">
-  <!-- Brand & User Identity -->
-  <div class="flex items-center gap-3">
+<header class="border-b border-slate-800/80 bg-slate-900/80 backdrop-blur-xl px-5 py-3 flex items-center justify-between gap-4 z-20">
+  <!-- Brand & Identity (Left) -->
+  <div class="flex items-center gap-3 shrink-0">
     <img
       src="/icon.png"
       alt="Raydrop Icon"
-      class="w-10 h-10 rounded-xl shadow-lg shadow-cyan-500/20 object-contain p-0.5 bg-slate-900/80 border border-cyan-500/30"
+      class="w-9 h-9 rounded-xl shadow-lg shadow-cyan-500/20 object-contain p-0.5 bg-slate-900 border border-cyan-500/30"
     />
     <div>
-      <div class="flex items-center gap-2.5">
-        <h1 class="text-lg font-bold tracking-tight text-white">Raydrop</h1>
+      <div class="flex items-center gap-2">
+        <h1 class="text-base font-extrabold tracking-tight text-white font-display">Raydrop</h1>
         <button
           type="button"
           on:click={() => checkForUpdates(true)}
@@ -69,23 +87,16 @@
             <span>Update {$updateInfo.latest_version}</span>
           </button>
         {/if}
-        {#if $appSettings.user_name}
-          <span class="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
-            {$appSettings.user_name}
-          </span>
-        {/if}
-        <span class="text-xs font-medium px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-300 border border-cyan-500/20">
-          {$appSettings.alias_name}
-        </span>
       </div>
 
       <div class="flex items-center gap-2 mt-0.5">
         {#if $appSettings.user_email}
-          <Mail class="w-3 h-3 text-cyan-400" />
-          <span class="text-xs font-mono text-cyan-300">{$appSettings.user_email}</span>
-          <span class="text-[11px] font-mono text-slate-500">({$appSettings.device_id})</span>
+          <Mail class="w-3 h-3 text-cyan-400 shrink-0" />
+          <span class="text-xs font-mono text-cyan-300 truncate max-w-[130px]" title={$appSettings.user_email}>
+            {$appSettings.user_email}
+          </span>
         {:else}
-          <span class="text-xs font-mono text-slate-400">{$appSettings.device_id}</span>
+          <span class="text-xs font-mono text-slate-400 truncate max-w-[130px]">{$appSettings.device_id}</span>
         {/if}
         <button
           on:click={copyIdentity}
@@ -93,79 +104,147 @@
           title="Copy Email / Device ID"
         >
           {#if copied}
-            <Check class="w-3.5 h-3.5 text-emerald-400" />
+            <Check class="w-3 h-3 text-emerald-400" />
           {:else}
-            <Copy class="w-3.5 h-3.5" />
+            <Copy class="w-3 h-3" />
           {/if}
         </button>
       </div>
     </div>
   </div>
 
-  <!-- Network Badges, Account & Discoverability Toggle -->
-  <div class="flex items-center gap-2.5">
-    <!-- LAN IP Badge -->
-    <div class="hidden xl:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800/70 border border-slate-700/60 text-xs text-slate-300">
-      <Wifi class="w-3.5 h-3.5 text-cyan-400" />
-      <span>LAN:</span>
-      <span class="font-mono text-slate-200">{$networkInfo.localIp}:{$networkInfo.listenPort}</span>
-    </div>
+  <!-- Center Segmented Navigation Tabs (Matching Filee / Landing Page style) -->
+  <nav class="flex items-center gap-1 bg-slate-950/80 p-1 rounded-2xl border border-slate-800/80 shadow-inner">
+    <!-- 1. Transfers & Streams (Default Active Full Tab) -->
+    <button
+      type="button"
+      on:click={() => activeMainTab.set('transfers')}
+      class="flex items-center gap-2 px-4 py-1.5 rounded-xl text-xs font-bold transition-all {$activeMainTab === 'transfers'
+        ? 'bg-gradient-to-r from-cyan-500/25 to-indigo-500/25 text-cyan-300 border border-cyan-500/40 shadow-sm shadow-cyan-500/15'
+        : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'}"
+    >
+      <Zap class="w-3.5 h-3.5 {$activeMainTab === 'transfers' ? 'text-cyan-400' : 'text-slate-400'}" />
+      <span>Transfers</span>
+      {#if $activeTransfers.length > 0}
+        <span class="text-[10px] px-1.5 py-0.2 rounded-full bg-cyan-400 text-slate-950 font-bold font-mono animate-pulse">
+          {$activeTransfers.length}
+        </span>
+      {/if}
+    </button>
 
-    <!-- WAN Signaling Badge -->
+    <!-- 2. LAN Radar (Inactive Tab) -->
+    <button
+      type="button"
+      on:click={() => activeMainTab.set('lan')}
+      class="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all {$activeMainTab === 'lan'
+        ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm shadow-cyan-500/15'
+        : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'}"
+    >
+      <Wifi class="w-3.5 h-3.5 {$activeMainTab === 'lan' ? 'text-cyan-400' : 'text-slate-400'}" />
+      <span>LAN Radar</span>
+      {#if $lanContacts.length > 0}
+        <span class="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-800 text-cyan-300 font-mono">
+          {$lanContacts.length}
+        </span>
+      {/if}
+    </button>
+
+    <!-- 3. My Devices (Inactive Tab) -->
+    <button
+      type="button"
+      on:click={() => activeMainTab.set('devices')}
+      class="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all {$activeMainTab === 'devices'
+        ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm shadow-cyan-500/15'
+        : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'}"
+    >
+      <Laptop class="w-3.5 h-3.5 {$activeMainTab === 'devices' ? 'text-cyan-400' : 'text-slate-400'}" />
+      <span>My Devices</span>
+      {#if $cloudMyDevices.length > 0}
+        <span class="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-800 text-slate-400 font-mono">
+          {$cloudMyDevices.length}
+        </span>
+      {/if}
+    </button>
+
+    <!-- 4. Contacts (Inactive Tab) -->
+    <button
+      type="button"
+      on:click={() => activeMainTab.set('contacts')}
+      class="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all {$activeMainTab === 'contacts'
+        ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm shadow-cyan-500/15'
+        : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'}"
+    >
+      <Users class="w-3.5 h-3.5 {$activeMainTab === 'contacts' ? 'text-cyan-400' : 'text-slate-400'}" />
+      <span>Contacts</span>
+      {#if $cloudContacts.length > 0}
+        <span class="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-800 text-slate-400 font-mono">
+          {$cloudContacts.length}
+        </span>
+      {/if}
+    </button>
+  </nav>
+
+  <!-- Status Badges & Quick Action Controls (Right) -->
+  <div class="flex items-center gap-2 shrink-0">
+    <!-- WAN STUN Status -->
     <div
-      class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs {$networkInfo.signalingConnected
+      class="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-xl border text-xs {$networkInfo.signalingConnected
         ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
         : 'bg-slate-800/70 border-slate-700/60 text-slate-400'}"
       title={$networkInfo.wanReflexiveAddr
         ? `Public NAT Endpoint: ${$networkInfo.wanReflexiveAddr}`
-        : 'WAN Signaling Status'}
+        : 'WAN Signaling & STUN Server'}
     >
       <Globe class="w-3.5 h-3.5 {$networkInfo.signalingConnected ? 'text-emerald-400' : 'text-slate-500'}" />
-      <span>WAN: {$networkInfo.signalingConnected ? 'Online' : 'Standby'}</span>
+      <span>{$networkInfo.signalingConnected ? 'Online' : 'Standby'}</span>
     </div>
 
-    <!-- Discoverable Toggle Switch -->
+    <!-- Discoverability Toggle -->
     <button
+      type="button"
       on:click={toggleDiscoverable}
-      class="flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all {$appSettings.discoverable
-        ? 'bg-cyan-500/15 border-cyan-500/40 text-cyan-300 shadow-sm shadow-cyan-500/10'
+      class="flex items-center gap-1.5 px-2.5 py-1 rounded-xl border text-xs font-semibold transition-all {$appSettings.discoverable
+        ? 'bg-cyan-500/15 border-cyan-500/40 text-cyan-300'
         : 'bg-slate-800/60 border-slate-700 text-slate-400'}"
+      title="Toggle whether nearby LAN peers can see this device"
     >
       <span
         class="w-2 h-2 rounded-full {$appSettings.discoverable
           ? 'bg-cyan-400 animate-pulse'
           : 'bg-slate-500'}"
       ></span>
-      <span>{$appSettings.discoverable ? 'Discoverable' : 'Hidden'}</span>
+      <span>{$appSettings.discoverable ? 'Visible' : 'Hidden'}</span>
     </button>
 
     <!-- Account Sign In / Out -->
     {#if $appSettings.auth_token}
       <button
+        type="button"
         on:click={handleLogout}
-        class="p-2 rounded-xl bg-slate-800/70 hover:bg-rose-500/20 border border-slate-700/70 hover:border-rose-500/30 text-slate-300 hover:text-rose-300 transition-colors"
+        class="p-1.5 rounded-xl bg-slate-800/70 hover:bg-rose-500/20 border border-slate-700/70 hover:border-rose-500/30 text-slate-300 hover:text-rose-300 transition-colors"
         title="Sign Out ({$appSettings.user_email})"
       >
         <LogOut class="w-4 h-4" />
       </button>
     {:else}
       <button
+        type="button"
         on:click={() => authModalOpen.set(true)}
-        class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs transition-colors"
+        class="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-white font-bold text-xs transition-colors shadow-sm shadow-cyan-500/20"
       >
         <LogIn class="w-3.5 h-3.5" />
         <span>Sign In</span>
       </button>
     {/if}
 
-    <!-- Settings Button -->
+    <!-- Settings Trigger Button -->
     <button
+      type="button"
       on:click={() => settingsModalOpen.set(true)}
-      class="p-2 rounded-xl bg-slate-800/70 hover:bg-slate-800 border border-slate-700/70 text-slate-300 hover:text-cyan-300 transition-colors"
-      title="Settings & OS Context Menu"
+      class="p-1.5 rounded-xl bg-slate-800/70 hover:bg-slate-700 border border-slate-700/70 text-slate-300 hover:text-white transition-colors"
+      title="Open Raydrop Settings"
     >
       <Settings class="w-4 h-4" />
     </button>
   </div>
 </header>
-

@@ -17,6 +17,7 @@
     incomingRequestQueue,
     cliQueuedFiles,
     authModalOpen,
+    activeMainTab,
   } from './lib/stores/state';
   import { contacts } from './lib/stores/contacts';
   import {
@@ -182,16 +183,21 @@
   });
 </script>
 
-<div class="h-screen w-screen flex flex-col bg-slate-950 text-slate-100 select-none">
+<div class="h-screen w-screen flex flex-col bg-slate-950 text-slate-100 select-none overflow-hidden relative">
+  <!-- Ambient floating blobs (matching landing page aesthetic) -->
+  <div class="ambient-blob w-[450px] h-[450px] bg-cyan-500/[0.07] -top-24 -left-24" aria-hidden="true"></div>
+  <div class="ambient-blob w-[450px] h-[450px] bg-indigo-500/[0.07] top-1/2 -right-24" aria-hidden="true"></div>
+  <div class="ambient-blob w-[380px] h-[380px] bg-emerald-500/[0.06] -bottom-24 left-1/3" aria-hidden="true"></div>
+
   <Header />
 
-  <main class="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 p-5 overflow-hidden">
-    <section class="lg:col-span-7 h-full overflow-hidden">
-      <ContactList />
-    </section>
-    <section class="lg:col-span-5 h-full overflow-hidden">
+  <!-- Main View: FULL width & height for Transfers & Streams, or active tab -->
+  <main class="flex-1 w-full p-4 overflow-hidden relative z-10">
+    {#if $activeMainTab === 'transfers'}
       <ActiveTransfers />
-    </section>
+    {:else}
+      <ContactList />
+    {/if}
   </main>
 
   <TransferModal />

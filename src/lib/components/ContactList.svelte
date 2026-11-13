@@ -5,6 +5,7 @@
     cloudMyDevices,
     cloudContacts,
     authModalOpen,
+    activeMainTab,
   } from '../stores/state';
   import { contacts, lanContacts } from '../stores/contacts';
   import {
@@ -29,9 +30,19 @@
     Mail,
     LogIn,
     ShieldCheck,
+    ArrowLeft,
   } from 'lucide-svelte';
 
   let activeTab: 'devices' | 'contacts' | 'lan' = 'devices';
+
+  $: if ($activeMainTab === 'lan' || $activeMainTab === 'devices' || $activeMainTab === 'contacts') {
+    activeTab = $activeMainTab;
+  }
+
+  function selectTab(tab: 'devices' | 'contacts' | 'lan') {
+    activeTab = tab;
+    activeMainTab.set(tab);
+  }
   let showAddContactModal = false;
   let newContactEmail = '';
   let errorMsg = '';
@@ -198,40 +209,52 @@
 
 <div class="flex flex-col h-full bg-slate-900/40 border border-slate-800/80 rounded-2xl overflow-hidden">
   <!-- Navigation Tabs -->
-  <div class="p-4 border-b border-slate-800/80 flex items-center justify-between gap-2">
-    <div class="flex items-center gap-1 bg-slate-950/70 p-1 rounded-xl border border-slate-800">
+  <div class="p-4 border-b border-slate-800/80 flex items-center justify-between gap-3 bg-slate-900/60 backdrop-blur-xl">
+    <div class="flex items-center gap-2">
       <button
-        on:click={() => (activeTab = 'devices')}
-        class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all {activeTab ===
-        'devices'
-          ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
-          : 'text-slate-400 hover:text-slate-200'}"
+        type="button"
+        on:click={() => activeMainTab.set('transfers')}
+        class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-semibold border border-slate-700 transition-colors"
+        title="Return to Transfers & Streams"
       >
-        <Laptop class="w-3.5 h-3.5" />
-        <span>My Devices ({$cloudMyDevices.length})</span>
+        <ArrowLeft class="w-3.5 h-3.5 text-cyan-400" />
+        <span>Transfers</span>
       </button>
 
-      <button
-        on:click={() => (activeTab = 'contacts')}
-        class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all {activeTab ===
-        'contacts'
-          ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
-          : 'text-slate-400 hover:text-slate-200'}"
-      >
-        <Users class="w-3.5 h-3.5" />
-        <span>Contacts ({$cloudContacts.length})</span>
-      </button>
+      <div class="flex items-center gap-1 bg-slate-950/70 p-1 rounded-xl border border-slate-800">
+        <button
+          on:click={() => selectTab('devices')}
+          class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all {activeTab ===
+          'devices'
+            ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
+            : 'text-slate-400 hover:text-slate-200'}"
+        >
+          <Laptop class="w-3.5 h-3.5" />
+          <span>My Devices ({$cloudMyDevices.length})</span>
+        </button>
 
-      <button
-        on:click={() => (activeTab = 'lan')}
-        class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all {activeTab ===
-        'lan'
-          ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
-          : 'text-slate-400 hover:text-slate-200'}"
-      >
-        <Wifi class="w-3.5 h-3.5" />
-        <span>LAN Radar ({$lanContacts.length})</span>
-      </button>
+        <button
+          on:click={() => selectTab('contacts')}
+          class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all {activeTab ===
+          'contacts'
+            ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
+            : 'text-slate-400 hover:text-slate-200'}"
+        >
+          <Users class="w-3.5 h-3.5" />
+          <span>Contacts ({$cloudContacts.length})</span>
+        </button>
+
+        <button
+          on:click={() => selectTab('lan')}
+          class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all {activeTab ===
+          'lan'
+            ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
+            : 'text-slate-400 hover:text-slate-200'}"
+        >
+          <Wifi class="w-3.5 h-3.5" />
+          <span>LAN Radar ({$lanContacts.length})</span>
+        </button>
+      </div>
     </div>
 
     {#if $appSettings.auth_token}
