@@ -238,6 +238,65 @@ async fn handle_signaling_message(app: &AppHandle, state: &Arc<AppState>, text: 
                 return;
             }
 
+            // Real-time P2P Chat Packet Handler (Zero Server DB, E2EE Relay / Direct)
+            if session_id.starts_with("chat:") {
+                let bytes = match hex::decode(payload_json) {
+                    Ok(b) => b,
+                    Err(_) => return,
+                };
+                let payload_str = match String::from_utf8(bytes) {
+                    Ok(s) => s,
+                    Err(_) => return,
+                };
+                let Ok(chat_val) = serde_json::from_str::<Value>(&payload_str) else {
+                    return;
+                };
+
+                let msg_id = chat_val
+                    .get("id")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or_else(|| session_id.trim_start_matches("chat:"))
+                    .to_string();
+                let content = chat_val
+                    .get("content")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or_default()
+                    .to_string();
+                let msg_type = chat_val
+                    .get("msg_type")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("text")
+                    .to_string();
+                let transfer_session_id = chat_val
+                    .get("transfer_session_id")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string());
+                let files_json = chat_val
+                    .get("files_json")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string());
+                let created_at = chat_val
+                    .get("created_at")
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or_else(now_unix_secs);
+
+                let chat_msg = crate::db::storage::ChatMessage {
+                    id: msg_id,
+                    peer_device_id: from_device_id.clone(),
+                    direction: "incoming".to_string(),
+                    content,
+                    msg_type,
+                    transfer_session_id,
+                    files_json,
+                    is_read: false,
+                    created_at,
+                };
+
+                let _ = state.db.insert_chat_message(&chat_msg);
+                let _ = app.emit("chat_message_received", &chat_msg);
+                return;
+            }
+
             let existing_tx = state
                 .relay_streams
                 .lock()

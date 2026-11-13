@@ -61,6 +61,14 @@ Unlike traditional file-sharing services that upload your files to third-party c
 - **Manifest Breakdown:** View full lists of received files, sizes, and folder trees.
 - **Transfer History & Filter Tabs:** Easily switch between **All**, **Received**, and **Sent** records with timestamps, transfer speeds, and progress indicators.
 
+### 💬 Integrated P2P Encrypted Chat with Media & File Transfer
+- **Direct LAN & Remote WAN Messaging:** Real-time end-to-end encrypted messaging with contacts and peers across local Wi-Fi or public internet with zero server database burden.
+- **Rich Markdown Formatter:** Full support for syntax-highlighted code blocks, formatting (`**bold**`, `*italic*`), blockquotes, tables, and planning task checklists.
+- **Integrated In-Chat File & Media Sharing:** Attach and send multiple images, videos, documents, PDFs, archives, and entire folders directly within the conversation.
+- **Real-Time Synchronized Streams:** Files sent in chat leverage Raydrop's multi-stream parallel acceleration and automatically appear in both the chat timeline and the main Active Transfers workspace with live progress indicators.
+- **Direct File Launch:** Open shared files directly from chat bubbles with system default apps or reveal them in Windows Explorer with 1 click.
+- **Zero Server Storage & Zero Server DB:** Chat history is stored 100% locally on each peer's private SQLite database. The server never stores chat messages or conversation logs.
+
 ---
 
 ## 🛡️ Security & Privacy Deep-Dive
@@ -75,6 +83,7 @@ Raydrop is engineered specifically for users and organizations who require absol
 | **File Names & Paths** | ❌ **Never tracked or stored** | ✅ Stored locally in recipient's private SQLite |
 | **File Sizes & Hashes** | ❌ **Never logged or tracked** | ✅ Stored locally in device transfer history |
 | **Transfer Logs & History** | ❌ **Zero server logs** | ✅ Kept 100% offline on the user's computer |
+| **P2P Chat Messages & Media** | ❌ **Zero server DB (0 bytes stored)** | ✅ Stored 100% locally in client SQLite database |
 | **User Account & Password** | ✅ Securely hashed (Argon2id / Salted SHA-256) | ✅ Cached auth token for sign-in |
 | **Registered Devices** | ✅ Device ID, name, OS, Ed25519 public key | ✅ Stored in local settings |
 | **Contacts & Trust Level** | ✅ Approved contact relationships | ✅ Synchronized contact list |
@@ -100,7 +109,7 @@ Pre-built binaries for **Windows (64-bit / x64)** are available on the [GitHub R
 | **Windows Installer** | `.msi` | **Recommended:** Installs desktop shortcuts, start menu entry, and Windows Explorer context menu integration. |
 | **Portable Executable** | `.exe` | Standalone portable binary that runs immediately without installation. |
 
-👉 **[Download the Latest Release (v1.1.3)](https://github.com/asepindrak/raydrop/releases/latest)**
+👉 **[Download the Latest Release (v1.1.4)](https://github.com/asepindrak/raydrop/releases/latest)**
 
 ---
 

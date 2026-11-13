@@ -12,6 +12,7 @@
   } from '../stores/state';
   import { contacts, lanContacts } from '../stores/contacts';
   import { activeTransfers } from '../stores/transfers';
+  import { totalUnreadCount } from '../stores/chat';
   import { raydropApi } from '../utils/tauri-ipc';
   import { updateInfo, updateModalOpen, updateChecking } from '../stores/update';
   import { checkForUpdates } from '../utils/updater';
@@ -31,6 +32,7 @@
     Users,
     Zap,
     Plus,
+    MessageSquare,
   } from 'lucide-svelte';
 
   let copied = false;
@@ -76,7 +78,7 @@
           {#if $updateChecking}
             <RefreshCw class="w-2.5 h-2.5 animate-spin text-cyan-400" />
           {/if}
-          <span>v1.1.3</span>
+          <span>v1.1.4</span>
         </button>
 
         {#if $updateInfo?.has_update}
@@ -131,6 +133,23 @@
       {#if $activeTransfers.length > 0}
         <span class="text-[10px] px-1.5 py-0.2 rounded-full bg-cyan-400 text-slate-950 font-bold font-mono animate-pulse">
           {$activeTransfers.length}
+        </span>
+      {/if}
+    </button>
+
+    <!-- 2. P2P Chat Tab -->
+    <button
+      type="button"
+      on:click={() => activeMainTab.set('chat')}
+      class="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all {$activeMainTab === 'chat'
+        ? 'bg-gradient-to-r from-cyan-500/25 to-indigo-500/25 text-cyan-300 border border-cyan-500/40 shadow-sm shadow-cyan-500/15'
+        : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'}"
+    >
+      <MessageSquare class="w-3.5 h-3.5 {$activeMainTab === 'chat' ? 'text-cyan-400' : 'text-slate-400'}" />
+      <span>Chat</span>
+      {#if $totalUnreadCount > 0}
+        <span class="text-[10px] px-1.5 py-0.2 rounded-full bg-cyan-400 text-slate-950 font-bold font-mono animate-pulse">
+          {$totalUnreadCount}
         </span>
       {/if}
     </button>

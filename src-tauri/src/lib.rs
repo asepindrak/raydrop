@@ -282,6 +282,11 @@ pub fn run() {
             commands::toggle_win11_direct_menu,
             commands::check_app_update,
             commands::download_and_install_update,
+            commands::send_chat_message,
+            commands::get_chat_messages,
+            commands::mark_chat_messages_read,
+            commands::clear_chat_messages,
+            commands::get_unread_chat_counts,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Raydrop Tauri application");

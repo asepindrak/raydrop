@@ -41,6 +41,19 @@ pub struct TransferRecord {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChatMessage {
+    pub id: String,
+    pub peer_device_id: String,
+    pub direction: String, // "incoming" or "outgoing"
+    pub content: String,
+    pub msg_type: String, // "text" or "file_transfer"
+    pub transfer_session_id: Option<String>,
+    pub files_json: Option<String>,
+    pub is_read: bool,
+    pub created_at: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppSettings {
     pub device_id: String,
     pub alias_name: String,
@@ -113,6 +126,20 @@ impl Database {
                 target_path TEXT,
                 created_at INTEGER NOT NULL
             );
+
+            CREATE TABLE IF NOT EXISTS chat_messages (
+                id TEXT PRIMARY KEY,
+                peer_device_id TEXT NOT NULL,
+                direction TEXT NOT NULL,
+                content TEXT NOT NULL,
+                msg_type TEXT NOT NULL DEFAULT 'text',
+                transfer_session_id TEXT,
+                files_json TEXT,
+                is_read INTEGER DEFAULT 0,
+                created_at INTEGER NOT NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_chat_peer_time ON chat_messages(peer_device_id, created_at);
             ",
         )
         .map_err(|e| e.to_string())?;
@@ -518,5 +545,113 @@ impl Database {
             list.push(r.map_err(|e| e.to_string())?);
         }
         Ok(list)
+    }
+
+    pub fn insert_chat_message(&self, msg: &ChatMessage) -> Result<(), String> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "INSERT OR REPLACE INTO chat_messages (id, peer_device_id, direction, content, msg_type, transfer_session_id, files_json, is_read, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+            params![
+                msg.id,
+                msg.peer_device_id,
+                msg.direction,
+                msg.content,
+                msg.msg_type,
+                msg.transfer_session_id,
+                msg.files_json,
+                if msg.is_read { 1 } else { 0 },
+                msg.created_at as i64
+            ],
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    pub fn list_chat_messages(
+        &self,
+        peer_device_id: &str,
+        limit: u32,
+        offset: u32,
+    ) -> Result<Vec<ChatMessage>, String> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn
+            .prepare(
+                "SELECT id, peer_device_id, direction, content, msg_type, transfer_session_id, files_json, is_read, created_at
+                 FROM chat_messages
+                 WHERE peer_device_id = ?1
+                 ORDER BY created_at ASC
+                 LIMIT ?2 OFFSET ?3",
+            )
+            .map_err(|e| e.to_string())?;
+
+        let rows = stmt
+            .query_map(params![peer_device_id, limit, offset], |row| {
+                Ok(ChatMessage {
+                    id: row.get(0)?,
+                    peer_device_id: row.get(1)?,
+                    direction: row.get(2)?,
+                    content: row.get(3)?,
+                    msg_type: row.get(4)?,
+                    transfer_session_id: row.get(5)?,
+                    files_json: row.get(6)?,
+                    is_read: row.get::<_, i64>(7)? != 0,
+                    created_at: row.get::<_, i64>(8)? as u64,
+                })
+            })
+            .map_err(|e| e.to_string())?;
+
+        let mut list = Vec::new();
+        for r in rows {
+            list.push(r.map_err(|e| e.to_string())?);
+        }
+        Ok(list)
+    }
+
+    pub fn mark_chat_read(&self, peer_device_id: &str) -> Result<(), String> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "UPDATE chat_messages SET is_read = 1 WHERE peer_device_id = ?1 AND is_read = 0",
+            params![peer_device_id],
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    pub fn clear_chat_messages(&self, peer_device_id: &str) -> Result<(), String> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "DELETE FROM chat_messages WHERE peer_device_id = ?1",
+            params![peer_device_id],
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    pub fn get_unread_chat_counts(&self) -> Result<std::collections::HashMap<String, u32>, String> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn
+            .prepare(
+                "SELECT peer_device_id, COUNT(*)
+                 FROM chat_messages
+                 WHERE is_read = 0 AND direction = 'incoming'
+                 GROUP BY peer_device_id",
+            )
+            .map_err(|e| e.to_string())?;
+
+        let rows = stmt
+            .query_map([], |row| {
+                let peer_id: String = row.get(0)?;
+                let count: i64 = row.get(1)?;
+                Ok((peer_id, count as u32))
+            })
+            .map_err(|e| e.to_string())?;
+
+        let mut map = std::collections::HashMap::new();
+        for r in rows {
+            let (k, v) = r.map_err(|e| e.to_string())?;
+            map.insert(k, v);
+        }
+        Ok(map)
     }
 }

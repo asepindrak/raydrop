@@ -142,6 +142,11 @@ $bodyText = @"
 - **Windows Portable App (`.exe` — Standalone / No Install):** \`Raydrop_${ver}_x64-portable.exe\`
 
 ### Features & Highlights
+- **Integrated P2P Encrypted Chat:** Real-time end-to-end encrypted messaging with contacts and peers across local LAN & remote WAN with zero server storage.
+- **Rich Markdown Formatter:** Code blocks with syntax highlighting, lists, bold/italic, tables, blockquotes, and plan checklists.
+- **In-Chat Multiple Media & File Transfer:** Send multiple images, videos, documents, PDFs, archives, and folders directly within the conversation.
+- **Synchronized Streams & Live Progress:** In-chat transfers leverage Raydrop's 6-stream engine and appear synchronously in both the chat bubble and the main Transfers dashboard.
+- **Direct File Launch:** Instant "Open" with default applications and "Locate" in Windows Explorer directly from chat bubbles.
 - **Redesigned Full-Width Workspace:** Dedicated full-screen Transfers & Streams dashboard matching the modern aesthetic.
 - **Native OS Multiple Drag & Drop:** Drop multiple files and folders directly from Windows Explorer with a fullscreen glowing drop indicator.
 - **Dedicated Send Files Hub:** Quick-action buttons to select multiple files/folders and 1-click send to online peers.

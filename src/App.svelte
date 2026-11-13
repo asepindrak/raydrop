@@ -5,6 +5,7 @@
   import Header from "./lib/components/Header.svelte";
   import ContactList from "./lib/components/ContactList.svelte";
   import ActiveTransfers from "./lib/components/ActiveTransfers.svelte";
+  import ChatView from "./lib/components/ChatView.svelte";
   import TransferModal from "./lib/components/TransferModal.svelte";
   import TraySettings from "./lib/components/TraySettings.svelte";
   import AuthModal from "./lib/components/AuthModal.svelte";
@@ -20,8 +21,14 @@
     cliQueuedFiles,
     authModalOpen,
     activeMainTab,
+    activeChatPeerId,
     isDraggingFiles,
   } from "./lib/stores/state";
+  import {
+    fetchUnreadCounts,
+    handleIncomingChatMessage,
+    markChatRead,
+  } from "./lib/stores/chat";
   import { contacts } from "./lib/stores/contacts";
   import {
     transfers,
@@ -38,6 +45,7 @@
     type TransferProgressEvent,
     type TransferRecord,
     type UpdateProgressPayload,
+    type ChatMessage,
   } from "./lib/utils/tauri-ipc";
 
   async function refreshCloudState(sigUrl: string, token: string | null) {
@@ -89,6 +97,7 @@
 
     contacts.set(await raydropApi.getContacts());
     transfers.set(await raydropApi.getTransferHistory());
+    await fetchUnreadCounts();
 
     if (!snap.settings.auth_token) {
       authModalOpen.set(true);
@@ -197,6 +206,18 @@
       },
     );
 
+    await raydropApi.listenEvent<ChatMessage>("chat_message_received", async (msg) => {
+      handleIncomingChatMessage(msg);
+      if ($activeMainTab === "chat" && $activeChatPeerId === msg.peer_device_id) {
+        await markChatRead(msg.peer_device_id);
+      } else {
+        try {
+          const win = getCurrentWindow();
+          await win.requestUserAttention(UserAttentionType.Informational);
+        } catch (_) {}
+      }
+    });
+
     // Native OS Drag and Drop multiple files/folders listener
     try {
       const webview = getCurrentWebview();
@@ -247,6 +268,8 @@
   <main class="flex-1 w-full p-4 overflow-hidden relative z-10">
     {#if $activeMainTab === "transfers"}
       <ActiveTransfers />
+    {:else if $activeMainTab === "chat"}
+      <ChatView />
     {:else}
       <ContactList />
     {/if}

@@ -6,6 +6,7 @@
     cloudContacts,
     authModalOpen,
     activeMainTab,
+    activeChatPeerId,
   } from '../stores/state';
   import { contacts, lanContacts } from '../stores/contacts';
   import {
@@ -31,7 +32,13 @@
     LogIn,
     ShieldCheck,
     ArrowLeft,
+    MessageSquare,
   } from 'lucide-svelte';
+
+  function openChatWith(deviceId: string) {
+    activeChatPeerId.set(deviceId);
+    activeMainTab.set('chat');
+  }
 
   let activeTab: 'devices' | 'contacts' | 'lan' = 'devices';
 
@@ -365,6 +372,14 @@
 
               {#if !isThisDevice}
                 <button
+                  on:click={() => openChatWith(dev.device_id)}
+                  class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-500/15 hover:bg-indigo-500 text-indigo-300 hover:text-slate-950 border border-indigo-500/30 text-xs font-semibold transition-all"
+                  title="P2P Chat"
+                >
+                  <MessageSquare class="w-3.5 h-3.5" />
+                  <span>Chat</span>
+                </button>
+                <button
                   on:click={() => sendToDeviceId(dev.device_id, dev.device_name, false)}
                   class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-500/15 hover:bg-cyan-500 text-cyan-300 hover:text-slate-950 border border-cyan-500/30 text-xs font-semibold transition-all"
                 >
@@ -439,6 +454,14 @@
                 </select>
 
                 {#if primaryDev}
+                  <button
+                    on:click={() => openChatWith(primaryDev.device_id)}
+                    class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-500/15 hover:bg-indigo-500 text-indigo-300 hover:text-slate-950 border border-indigo-500/30 text-xs font-semibold transition-all"
+                    title="P2P Chat"
+                  >
+                    <MessageSquare class="w-3.5 h-3.5" />
+                    <span>Chat</span>
+                  </button>
                   <button
                     on:click={() => sendToDeviceId(primaryDev.device_id, `${group.name} (${primaryDev.device_name})`, false)}
                     class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-500/15 hover:bg-cyan-500 text-cyan-300 hover:text-slate-950 border border-cyan-500/30 text-xs font-semibold transition-all"
@@ -529,6 +552,14 @@
               <option value="blocked">Blocked</option>
             </select>
 
+            <button
+              on:click={() => openChatWith(peer.device_id)}
+              class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-500/15 hover:bg-indigo-500 text-indigo-300 hover:text-slate-950 border border-indigo-500/30 text-xs font-semibold transition-all"
+              title="P2P Chat"
+            >
+              <MessageSquare class="w-3.5 h-3.5" />
+              <span>Chat</span>
+            </button>
             <button
               on:click={() => sendToDeviceId(peer.device_id, peer.alias_name, false)}
               class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-500/15 hover:bg-cyan-500 text-cyan-300 hover:text-slate-950 border border-cyan-500/30 text-xs font-semibold transition-all"

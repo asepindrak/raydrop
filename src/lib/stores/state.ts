@@ -46,5 +46,6 @@ export const incomingRequestQueue = writable<IncomingTransferEvent[]>([]);
 export const cliQueuedFiles = writable<string[]>([]);
 export const settingsModalOpen = writable<boolean>(false);
 export const authModalOpen = writable<boolean>(false);
-export const activeMainTab = writable<'transfers' | 'lan' | 'devices' | 'contacts'>('transfers');
+export const activeMainTab = writable<'transfers' | 'chat' | 'lan' | 'devices' | 'contacts'>('transfers');
+export const activeChatPeerId = writable<string | null>(null);
 export const isDraggingFiles = writable<boolean>(false);

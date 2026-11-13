@@ -111,6 +111,24 @@ export interface TransferRecord {
   eta_seconds?: number;
 }
 
+export interface ChatFileItem {
+  name: string;
+  size: number;
+  path?: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  peer_device_id: string;
+  direction: 'incoming' | 'outgoing';
+  content: string;
+  msg_type: 'text' | 'file_transfer';
+  transfer_session_id?: string | null;
+  files_json?: string | null;
+  is_read: boolean;
+  created_at: number;
+}
+
 export interface TransferProgressEvent {
   session_id: string;
   peer_device_id: string;
@@ -218,6 +236,28 @@ export const raydropApi = {
   checkAppUpdate: () => invoke<UpdateCheckResult>('check_app_update'),
   downloadAndInstallUpdate: (downloadUrl: string, assetName: string) =>
     invoke<string>('download_and_install_update', { downloadUrl, assetName }),
+  sendChatMessage: (
+    peerDeviceId: string,
+    content: string,
+    msgType?: string,
+    transferSessionId?: string | null,
+    filesJson?: string | null
+  ) =>
+    invoke<ChatMessage>('send_chat_message', {
+      peerDeviceId,
+      content,
+      msgType,
+      transferSessionId,
+      filesJson,
+    }),
+  getChatMessages: (peerDeviceId: string, limit?: number, offset?: number) =>
+    invoke<ChatMessage[]>('get_chat_messages', { peerDeviceId, limit, offset }),
+  markChatMessagesRead: (peerDeviceId: string) =>
+    invoke<void>('mark_chat_messages_read', { peerDeviceId }),
+  clearChatMessages: (peerDeviceId: string) =>
+    invoke<void>('clear_chat_messages', { peerDeviceId }),
+  getUnreadChatCounts: () =>
+    invoke<Record<string, number>>('get_unread_chat_counts'),
   listenEvent: <T>(event: string, handler: (payload: T) => void): Promise<UnlistenFn> =>
     listen<T>(event, (e) => handler(e.payload)),
 };

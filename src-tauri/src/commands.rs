@@ -1,4 +1,4 @@
-use crate::db::storage::{now_unix_secs, AppSettings, Contact, TransferRecord};
+use crate::db::storage::{now_unix_secs, AppSettings, ChatMessage, Contact, TransferRecord};
 use crate::network::transport::{initiate_peer_transfer, resume_peer_transfer};
 use crate::os::{register_context_menu, set_autostart};
 use crate::state::{AppState, IncomingRequestDecision};
@@ -999,5 +999,97 @@ pub async fn download_and_install_update(
     {
         return Ok(format!("Downloaded update to {}", temp_file_path.to_string_lossy()));
     }
+}
+
+#[tauri::command]
+pub fn send_chat_message(
+    app: AppHandle,
+    state: State<'_, Arc<AppState>>,
+    peer_device_id: String,
+    content: String,
+    msg_type: Option<String>,
+    transfer_session_id: Option<String>,
+    files_json: Option<String>,
+) -> Result<ChatMessage, String> {
+    let now = now_unix_secs();
+    let msg_id = uuid::Uuid::new_v4().to_string();
+    let effective_type = msg_type.unwrap_or_else(|| "text".to_string());
+
+    let chat_msg = ChatMessage {
+        id: msg_id.clone(),
+        peer_device_id: peer_device_id.clone(),
+        direction: "outgoing".to_string(),
+        content: content.clone(),
+        msg_type: effective_type.clone(),
+        transfer_session_id: transfer_session_id.clone(),
+        files_json: files_json.clone(),
+        is_read: true,
+        created_at: now,
+    };
+
+    state.db.insert_chat_message(&chat_msg)?;
+
+    let payload_obj = json!({
+        "id": msg_id,
+        "content": content,
+        "msg_type": effective_type,
+        "transfer_session_id": transfer_session_id,
+        "files_json": files_json,
+        "from_alias": state.settings.lock().unwrap().alias_name,
+        "created_at": now
+    })
+    .to_string();
+
+    let hex_payload = hex::encode(payload_obj.as_bytes());
+
+    if let Some(tx) = state.signaling_tx.lock().unwrap().as_ref() {
+        let packet = json!({
+            "type": "RELAY_CONTROL",
+            "session_id": format!("chat:{msg_id}"),
+            "from_device_id": state.identity.device_id,
+            "target_device_id": peer_device_id,
+            "payload_json": hex_payload
+        })
+        .to_string();
+        let _ = tx.send(packet);
+    }
+
+    let _ = app.emit("chat_message_sent", &chat_msg);
+    Ok(chat_msg)
+}
+
+#[tauri::command]
+pub fn get_chat_messages(
+    state: State<'_, Arc<AppState>>,
+    peer_device_id: String,
+    limit: Option<u32>,
+    offset: Option<u32>,
+) -> Result<Vec<ChatMessage>, String> {
+    state
+        .db
+        .list_chat_messages(&peer_device_id, limit.unwrap_or(200), offset.unwrap_or(0))
+}
+
+#[tauri::command]
+pub fn mark_chat_messages_read(
+    state: State<'_, Arc<AppState>>,
+    peer_device_id: String,
+) -> Result<(), String> {
+    state.db.mark_chat_read(&peer_device_id)
+}
+
+#[tauri::command]
+pub fn clear_chat_messages(
+    state: State<'_, Arc<AppState>>,
+    peer_device_id: String,
+) -> Result<(), String> {
+    state.db.clear_chat_messages(&peer_device_id)
+}
+
+#[tauri::command]
+pub fn get_unread_chat_counts(
+    state: State<'_, Arc<AppState>>,
+) -> Result<std::collections::HashMap<String, u32>, String> {
+    state.db.get_unread_chat_counts()
 }
 
