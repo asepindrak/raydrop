@@ -21,12 +21,12 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=dokploy-network"
-      # HTTP (Port 80) -> Auto Redirect to HTTPS
-      - "traefik.http.middlewares.raydrop-https-redirect.redirectscheme.scheme=https"
-      - "traefik.http.middlewares.raydrop-https-redirect.redirectscheme.permanent=true"
+      # HTTP -> HTTPS Redirect
+      - "traefik.http.middlewares.raydrop-signal-redirect.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.raydrop-signal-redirect.redirectscheme.permanent=true"
       - "traefik.http.routers.raydrop-signal-web.rule=Host(`${SIGNAL_DOMAIN:-stun.raydrop.web.id}`)"
       - "traefik.http.routers.raydrop-signal-web.entrypoints=web"
-      - "traefik.http.routers.raydrop-signal-web.middlewares=raydrop-https-redirect"
+      - "traefik.http.routers.raydrop-signal-web.middlewares=raydrop-signal-redirect"
       # HTTPS & WSS (Port 443 via Let's Encrypt)
       - "traefik.http.routers.raydrop-signal.rule=Host(`${SIGNAL_DOMAIN:-stun.raydrop.web.id}`)"
       - "traefik.http.routers.raydrop-signal.entrypoints=websecure"
@@ -47,10 +47,12 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=dokploy-network"
-      # HTTP (Port 80) -> Auto Redirect to HTTPS
+      # HTTP -> HTTPS Redirect
+      - "traefik.http.middlewares.raydrop-landing-redirect.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.raydrop-landing-redirect.redirectscheme.permanent=true"
       - "traefik.http.routers.raydrop-landing-web.rule=Host(`${LANDING_DOMAIN:-raydrop.web.id}`)"
       - "traefik.http.routers.raydrop-landing-web.entrypoints=web"
-      - "traefik.http.routers.raydrop-landing-web.middlewares=raydrop-https-redirect"
+      - "traefik.http.routers.raydrop-landing-web.middlewares=raydrop-landing-redirect"
       # HTTPS (Port 443 via Let's Encrypt)
       - "traefik.http.routers.raydrop-landing.rule=Host(`${LANDING_DOMAIN:-raydrop.web.id}`)"
       - "traefik.http.routers.raydrop-landing.entrypoints=websecure"
