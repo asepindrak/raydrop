@@ -138,13 +138,16 @@ $bodyText = @"
 - **Windows Portable App (`.exe` — Standalone / No Install):** \`Raydrop_${ver}_x64-portable.exe\`
 
 ### Features & Highlights
+- **Redesigned Full-Width Workspace:** Dedicated full-screen Transfers & Streams dashboard matching the modern aesthetic.
+- **Native OS Multiple Drag & Drop:** Drop multiple files and folders directly from Windows Explorer with a fullscreen glowing drop indicator.
+- **Dedicated Send Files Hub:** Quick-action buttons to select multiple files/folders and 1-click send to online peers.
 - **Zero-Server High-Speed File Transfer:** True peer-to-peer over local LAN and global WAN.
 - **Dynamic 6-Stream Parallel Workers:** IDM-style chunk acceleration for massive files (up to 125 MB/s).
 - **Auto-Resumable Chunk Engine:** Reconnect seamlessly after Wi-Fi drops without restarting from scratch.
 - **End-to-End Cryptographic Security:** BLAKE3 checksums, X25519 ECDH key exchange, and ChaCha20-Poly1305.
 - **Windows 11 Native Context Menu:** Direct 1-click right-click integration on Windows Explorer.
 - **In-App Auto-Updater:** One-click seamless upgrade notification for all peers.
-- **Live Download Landing Page:** Automatically synced in real-time at [raydrop.web.id](https://raydrop.web.id).
+- **Live Bilingual Landing Page:** Automatically synced in real-time at [raydrop.web.id](https://raydrop.web.id).
 "@
 
 # 7. Create or Get GitHub Release
