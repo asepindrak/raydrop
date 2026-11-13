@@ -259,6 +259,8 @@ export const raydropApi = {
     invoke<void>('clear_chat_messages', { peerDeviceId }),
   getUnreadChatCounts: () =>
     invoke<Record<string, number>>('get_unread_chat_counts'),
+  updateTrayBadge: (count: number) =>
+    invoke<void>('update_tray_badge', { count }),
   openExternalUrl: (url: string) =>
     invoke<void>('open_external_url', { url }),
   getFileThumbnail: (path: string) =>

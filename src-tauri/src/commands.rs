@@ -1116,6 +1116,7 @@ pub fn send_chat_message(
 
     let hex_payload = hex::encode(payload_obj.as_bytes());
 
+    // 1. Send via active WAN signaling relay
     if let Some(tx) = state.signaling_tx.lock().unwrap().as_ref() {
         let packet = json!({
             "type": "RELAY_CONTROL",
@@ -1126,6 +1127,36 @@ pub fn send_chat_message(
         })
         .to_string();
         let _ = tx.send(packet);
+    }
+
+    // 2. Also attempt direct LAN / Tailscale TCP delivery if contact has known local IP & port
+    if let Ok(Some(contact)) = state.db.get_contact(&peer_device_id) {
+        if let (Some(ip), Some(port)) = (contact.last_known_ip, contact.last_known_port) {
+            let target_addr = format!("{}:{}", ip, port);
+            let hex_p = hex_payload.clone();
+            let my_dev_id = state.identity.device_id.clone();
+            tauri::async_runtime::spawn(async move {
+                if let Ok(Ok(mut stream)) = tokio::time::timeout(
+                    std::time::Duration::from_millis(1500),
+                    tokio::net::TcpStream::connect(&target_addr),
+                )
+                .await
+                {
+                    let packet_val = json!({
+                        "type": "CHAT",
+                        "from_device_id": my_dev_id,
+                        "payload_json": hex_p
+                    });
+                    if let Ok(data) = serde_json::to_vec(&packet_val) {
+                        let len_prefix = (data.len() as u32).to_be_bytes();
+                        use tokio::io::AsyncWriteExt;
+                        let _ = stream.write_all(&len_prefix).await;
+                        let _ = stream.write_all(&data).await;
+                        let _ = stream.flush().await;
+                    }
+                }
+            });
+        }
     }
 
     let _ = app.emit("chat_message_sent", &chat_msg);
@@ -1146,10 +1177,22 @@ pub fn get_chat_messages(
 
 #[tauri::command]
 pub fn mark_chat_messages_read(
+    app: AppHandle,
     state: State<'_, Arc<AppState>>,
     peer_device_id: String,
 ) -> Result<(), String> {
-    state.db.mark_chat_read(&peer_device_id)
+    state.db.mark_chat_read(&peer_device_id)?;
+    if let Ok(counts) = state.db.get_unread_chat_counts() {
+        let total: u32 = counts.values().sum();
+        crate::tray_badge::update_tray_unread_badge(&app, total);
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn update_tray_badge(app: AppHandle, count: u32) -> Result<(), String> {
+    crate::tray_badge::update_tray_unread_badge(&app, count);
+    Ok(())
 }
 
 #[tauri::command]

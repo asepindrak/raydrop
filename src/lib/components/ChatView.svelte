@@ -35,7 +35,7 @@
     Image as ImageIcon
   } from 'lucide-svelte';
   import { contacts, lanContacts } from '../stores/contacts';
-  import { cloudContacts, cloudMyDevices, activeChatPeerId, appSettings, incomingRequestQueue } from '../stores/state';
+  import { cloudContacts, cloudMyDevices, activeChatPeerId, appSettings, incomingRequestQueue, activeMainTab } from '../stores/state';
   import {
     chatStore,
     unreadCounts,
@@ -214,22 +214,43 @@
     activeChatPeerId.set(filteredPeers[0].id);
   }
 
-  // When active peer changes, load chat history and scroll to bottom
+  // When active peer changes or user switches to 'chat' tab, load chat history, mark read and scroll to bottom
   let prevPeerId: string | null = null;
   $: if ($activeChatPeerId && $activeChatPeerId !== prevPeerId) {
     prevPeerId = $activeChatPeerId;
     loadChatHistory($activeChatPeerId).then(() => {
-      tick().then(() => scrollToBottom());
+      tick().then(() => {
+        scrollToBottom();
+        setTimeout(scrollToBottom, 60);
+      });
     });
   }
 
-  // Auto-scroll to bottom when new messages arrive
+  // Reactive tab focus handler: auto-scroll when user returns to 'chat' tab
+  let prevTab = '';
+  $: if ($activeMainTab === 'chat' && prevTab !== 'chat') {
+    prevTab = 'chat';
+    if ($activeChatPeerId) {
+      markChatRead($activeChatPeerId);
+      tick().then(() => {
+        scrollToBottom();
+        setTimeout(scrollToBottom, 60);
+      });
+    }
+  } else if ($activeMainTab !== 'chat') {
+    prevTab = $activeMainTab;
+  }
+
+  // Auto-scroll to bottom when new messages arrive (both incoming & outgoing)
   let prevMsgCount = 0;
   $: if (activeMessages.length !== prevMsgCount) {
-    const isInitialOrNewOutgoing = activeMessages.length > prevMsgCount && (prevMsgCount === 0 || activeMessages[activeMessages.length - 1]?.direction === 'outgoing');
+    const isNew = activeMessages.length > prevMsgCount;
     prevMsgCount = activeMessages.length;
-    if (isInitialOrNewOutgoing) {
-      tick().then(() => scrollToBottom());
+    if (isNew) {
+      tick().then(() => {
+        scrollToBottom();
+        setTimeout(scrollToBottom, 60);
+      });
     }
   }
 

@@ -49,6 +49,7 @@ struct ServerState {
 
 #[allow(dead_code)]
 struct PeerSession {
+    conn_id: Uuid,
     user_id: Option<String>,
     user_email: Option<String>,
     alias_name: String,
@@ -1142,6 +1143,7 @@ fn verify_registration(
 }
 
 async fn handle_socket(socket: WebSocket, client_ip: String, state: ServerState) {
+    let conn_id = Uuid::new_v4();
     let (mut ws_tx, mut ws_rx) = socket.split();
     let (tx, mut rx) = mpsc::channel::<String>(PEER_CHANNEL_CAPACITY);
 
@@ -1208,6 +1210,7 @@ async fn handle_socket(socket: WebSocket, client_ip: String, state: ServerState)
                             state.peers.insert(
                                 device_id.clone(),
                                 PeerSession {
+                                    conn_id,
                                     user_id: uid_opt.clone(),
                                     user_email: email_opt,
                                     alias_name: safe_alias,
@@ -1371,10 +1374,19 @@ async fn handle_socket(socket: WebSocket, client_ip: String, state: ServerState)
     }
 
     if let Some(id) = registered_id {
-        state.peers.remove(&id);
-        info!("Peer disconnected: {id}");
-        if let Some(uid) = registered_user_id {
-            broadcast_presence_update(&state, &uid);
+        let is_current = if let Some(peer) = state.peers.get(&id) {
+            peer.conn_id == conn_id
+        } else {
+            false
+        };
+        if is_current {
+            state.peers.remove(&id);
+            info!("Peer disconnected: {id}");
+            if let Some(uid) = registered_user_id {
+                broadcast_presence_update(&state, &uid);
+            }
+        } else {
+            info!("Stale peer session closed for {id}, keeping active connection.");
         }
     }
     writer_task.abort();

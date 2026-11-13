@@ -307,6 +307,10 @@ async fn handle_signaling_message(app: &AppHandle, state: &Arc<AppState>, text: 
                 };
 
                 let _ = state.db.insert_chat_message(&chat_msg);
+                if let Ok(counts) = state.db.get_unread_chat_counts() {
+                    let total: u32 = counts.values().sum();
+                    crate::tray_badge::update_tray_unread_badge(app, total);
+                }
                 let _ = app.emit("chat_message_received", &chat_msg);
                 return;
             }

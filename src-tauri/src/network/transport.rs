@@ -542,8 +542,88 @@ where
         return Ok(());
     }
 
-    // Step 1: Read & verify HELLO frame
-    let hello: HelloFrame = read_json_packet(&mut reader).await?;
+    // Step 1: Read & verify HELLO or direct CHAT frame
+    let raw_val: serde_json::Value = read_json_packet(&mut reader).await?;
+    let frame_type = raw_val.get("type").and_then(|v| v.as_str()).unwrap_or_default();
+
+    if frame_type == "CHAT" {
+        let from_device_id = raw_val
+            .get("from_device_id")
+            .and_then(|v| v.as_str())
+            .unwrap_or_default()
+            .to_string();
+        let payload_json = raw_val
+            .get("payload_json")
+            .and_then(|v| v.as_str())
+            .unwrap_or_default();
+
+        if !from_device_id.is_empty() && !payload_json.is_empty() {
+            if let Ok(Some(contact)) = state.db.get_contact(&from_device_id) {
+                if contact.trust_level == "blocked" {
+                    warn!("Dropped direct LAN chat packet from blocked peer: {from_device_id}");
+                    return Ok(());
+                }
+            }
+
+            if let Ok(bytes) = hex::decode(payload_json) {
+                if let Ok(payload_str) = String::from_utf8(bytes) {
+                    if let Ok(chat_val) = serde_json::from_str::<serde_json::Value>(&payload_str) {
+                        let msg_id = chat_val
+                            .get("id")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or_default()
+                            .to_string();
+                        let content = chat_val
+                            .get("content")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or_default()
+                            .to_string();
+                        let msg_type = chat_val
+                            .get("msg_type")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("text")
+                            .to_string();
+                        let transfer_session_id = chat_val
+                            .get("transfer_session_id")
+                            .and_then(|v| v.as_str())
+                            .map(|s| s.to_string());
+                        let files_json = chat_val
+                            .get("files_json")
+                            .and_then(|v| v.as_str())
+                            .map(|s| s.to_string());
+                        let created_at = chat_val
+                            .get("created_at")
+                            .and_then(|v| v.as_u64())
+                            .unwrap_or_else(crate::db::storage::now_unix_secs);
+
+                        let chat_msg = crate::db::storage::ChatMessage {
+                            id: msg_id,
+                            peer_device_id: from_device_id,
+                            direction: "incoming".to_string(),
+                            content,
+                            msg_type,
+                            transfer_session_id,
+                            files_json,
+                            is_read: false,
+                            created_at,
+                        };
+
+                        let _ = state.db.insert_chat_message(&chat_msg);
+                        if let Ok(counts) = state.db.get_unread_chat_counts() {
+                            let total: u32 = counts.values().sum();
+                            crate::tray_badge::update_tray_unread_badge(&app, total);
+                        }
+                        let _ = app.emit("chat_message_received", &chat_msg);
+                        let _ = writer.write_all(b"OK").await;
+                    }
+                }
+            }
+        }
+        return Ok(());
+    }
+
+    let hello: HelloFrame = serde_json::from_value(raw_val)
+        .map_err(|e| format!("Expected HELLO frame: {e}"))?;
     if hello.frame_type != "HELLO" {
         return Err("Expected HELLO frame".to_string());
     }

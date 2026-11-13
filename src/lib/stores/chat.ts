@@ -20,6 +20,11 @@ export const totalUnreadCount = derived(unreadCounts, ($counts) => {
   return Object.values($counts).reduce((acc, curr) => acc + (curr || 0), 0);
 });
 
+// Sync total unread count to System Tray icon badge & taskbar badge
+totalUnreadCount.subscribe((count) => {
+  raydropApi.updateTrayBadge(count).catch(() => {});
+});
+
 export async function fetchUnreadCounts() {
   try {
     const counts = await raydropApi.getUnreadChatCounts();

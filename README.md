@@ -108,7 +108,7 @@ Pre-built binaries for **Windows (64-bit / x64)** are available on the [GitHub R
 | :--- | :---: | :--- |
 | **Windows Installer** | `.msi` | Official Windows installer with desktop shortcuts, system tray, and Windows Explorer context menu integration. |
 
-👉 **[Download the Latest Release (v1.2.1)](https://github.com/asepindrak/raydrop/releases/latest)**
+👉 **[Download the Latest Release (v1.2.2)](https://github.com/asepindrak/raydrop/releases/latest)**
 
 ---
 

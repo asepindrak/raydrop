@@ -4,6 +4,7 @@ pub mod db;
 pub mod network;
 pub mod os;
 pub mod state;
+pub mod tray_badge;
 
 use crate::db::storage::Database;
 use crate::network::{
@@ -132,17 +133,18 @@ pub fn run() {
             let state_tray = state_for_setup.clone();
             let toggle_item_clone = toggle_item.clone();
             let autostart_item_clone = autostart_item.clone();
+            let state_menu = state_tray.clone();
 
-            let mut tray_builder = TrayIconBuilder::new()
+            let mut tray_builder = TrayIconBuilder::with_id("main_tray")
                 .menu(&menu)
                 .tooltip("Raydrop — Universal P2P File Transfer")
                 .on_menu_event(move |app_handle, event| match event.id.as_ref() {
                     "toggle_disc" => {
-                        let next = !state_tray.is_discoverable();
-                        let _ = state_tray
+                        let next = !state_menu.is_discoverable();
+                        let _ = state_menu
                             .db
                             .set_setting("discoverable", if next { "true" } else { "false" });
-                        if let Ok(mut s) = state_tray.settings.lock() {
+                        if let Ok(mut s) = state_menu.settings.lock() {
                             s.discoverable = next;
                         }
                         let new_label = if next {
@@ -154,17 +156,17 @@ pub fn run() {
                         let _ = app_handle.emit("discoverability_changed", next);
                     }
                     "toggle_autostart" => {
-                        let current = state_tray
+                        let current = state_menu
                             .settings
                             .lock()
                             .map(|s| s.autostart)
                             .unwrap_or(true);
                         let next = !current;
                         let _ = crate::os::set_autostart(next);
-                        let _ = state_tray
+                        let _ = state_menu
                             .db
                             .set_setting("autostart", if next { "true" } else { "false" });
-                        if let Ok(mut s) = state_tray.settings.lock() {
+                        if let Ok(mut s) = state_menu.settings.lock() {
                             s.autostart = next;
                         }
                         let new_label = if next {
@@ -209,6 +211,12 @@ pub fn run() {
                 tray_builder = tray_builder.icon(icon.clone());
             }
             let _ = tray_builder.build(app)?;
+
+            // Initialize System Tray badge with unread messages count on startup
+            if let Ok(counts) = state_tray.db.get_unread_chat_counts() {
+                let total: u32 = counts.values().sum();
+                crate::tray_badge::update_tray_unread_badge(&app.handle(), total);
+            }
 
             // Auto-register OS Right-Click Context Menu ("Send with Raydrop") on startup
             match crate::os::register_context_menu() {
@@ -287,6 +295,7 @@ pub fn run() {
             commands::mark_chat_messages_read,
             commands::clear_chat_messages,
             commands::get_unread_chat_counts,
+            commands::update_tray_badge,
             commands::open_external_url,
             commands::get_file_thumbnail,
         ])

@@ -139,7 +139,10 @@ $bodyText = @"
 - **Windows Setup Installer (`.msi`):** \`Raydrop_${ver}_x64_en-US.msi\`
 
 ### Features & Highlights
-- **Sliding-Window Flow Control for WAN Relay:** Fixed progress stalling at ~39% on large files over WAN relay tunnel. Implemented sender in-flight sliding window flow control to prevent buffer overflows, tuned worker concurrency, and added strict receiver BLAKE3 completion verification.
+- **System Tray Live Unread Chat Badge:** The Windows system tray icon now dynamically renders a live badge showing the exact number of unread chat messages with high-contrast indicator, matching bitmap font digits (`1`..`9`, `9+`), and informative tooltips.
+- **Dual-Path Instant Chat (LAN + Tailscale + WAN Relay):** Chat messages are now transmitted via direct local TCP if the peer is reachable on the local network or Tailscale mesh, with seamless fallback to encrypted WAN relay tunnel.
+- **Fixed Realtime In-Chat Auto-Scroll & Visibility:** Resolved an issue where incoming chat messages did not trigger viewport auto-scroll and remained hidden below the fold. Switching to the chat tab now immediately focuses latest messages and marks them as read.
+- **Signal Server Session State Resilience:** Patched connection registry race conditions where stale reconnecting sockets removed active peer sessions.
 - **Auto-Incremental Duplicate File Downloads:** Sending a file with a name that was previously downloaded now automatically appends a clean increment number (`filename (1).ext`, `filename (2).ext`), preventing overwrite/false completion and ensuring newly sent files always download seamlessly.
 - **Ultra-Fast Realtime File Receive Popup:** Eliminated synchronous blocking STUN discovery from handshake path and added parallel concurrent Happy Eyeballs candidate race, making incoming transfer request modals appear instantaneously in real-time.
 - **Markdown Formatted Release Notes:** In-app update notifications and release dialogs now render rich markdown styling (headings, lists, code blocks, links) with automatic external browser launching.
