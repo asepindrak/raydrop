@@ -4,7 +4,7 @@ use crate::network::nat::{bind_reusable_udp_socket, discover_wan_reflexive_addre
 use crate::state::{AppState, IncomingRequestDecision, ManifestFileEntry};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::net::SocketAddr;
 use std::path::{Component, Path, PathBuf};
 use std::sync::{
@@ -206,6 +206,48 @@ pub fn sanitize_relative_path(raw: &str) -> Result<PathBuf, String> {
         return Err("Empty relative file path".to_string());
     }
     Ok(clean)
+}
+
+/// Finds a unique non-colliding destination path by appending an increment counter "(1)", "(2)", etc.
+/// if a file with the target name already exists on disk or was already allocated in this session.
+pub fn get_unique_destination_path(
+    target_root: &Path,
+    rel: &Path,
+    used_paths: &mut HashSet<PathBuf>,
+) -> PathBuf {
+    let candidate = target_root.join(rel);
+    let part_candidate = candidate.with_file_name(format!(
+        "{}.raypart",
+        candidate.file_name().and_then(|n| n.to_str()).unwrap_or("file")
+    ));
+
+    if !candidate.exists() && !part_candidate.exists() && !used_paths.contains(&candidate) {
+        used_paths.insert(candidate.clone());
+        return candidate;
+    }
+
+    let parent = candidate.parent().unwrap_or(target_root);
+    let stem = candidate
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("file");
+    let ext = candidate.extension().and_then(|e| e.to_str());
+
+    let mut counter = 1u32;
+    loop {
+        let new_file_name = match ext {
+            Some(e) if !e.is_empty() => format!("{} ({}).{}", stem, counter, e),
+            _ => format!("{} ({})", stem, counter),
+        };
+        let new_path = parent.join(&new_file_name);
+        let new_part_path = parent.join(format!("{}.raypart", new_file_name));
+
+        if !new_path.exists() && !new_part_path.exists() && !used_paths.contains(&new_path) {
+            used_paths.insert(new_path.clone());
+            return new_path;
+        }
+        counter += 1;
+    }
 }
 
 async fn write_json_packet<W: AsyncWrite + Unpin>(writer: &mut W, value: &impl Serialize) -> Result<(), String> {
@@ -613,14 +655,14 @@ where
             }
         });
 
-    let decision = if let Some(saved_dir) = existing_session_dir {
+    let decision = if let Some(ref saved_dir) = existing_session_dir {
         info!(
             "Auto-resuming previously accepted transfer session {} into {}",
             hello.session_id, saved_dir
         );
         IncomingRequestDecision {
             accepted: true,
-            target_directory: Some(saved_dir),
+            target_directory: Some(saved_dir.clone()),
         }
     } else if trust_level == "trusted_auto_accept" {
         popup_and_focus_main_window(&app);
@@ -692,6 +734,7 @@ where
         return Ok(());
     }
 
+    let is_resuming = existing_session_dir.is_some();
     let target_root = PathBuf::from(decision.target_directory.unwrap_or(default_dl));
     std::fs::create_dir_all(&target_root).map_err(|e| e.to_string())?;
 
@@ -700,10 +743,15 @@ where
     let mut file_map: HashMap<u32, (PathBuf, PathBuf, u64)> = HashMap::new();
     let mut downloaded_file_paths: Vec<String> = Vec::new();
     let mut already_received_bytes: u64 = 0;
+    let mut used_destination_paths: HashSet<PathBuf> = HashSet::new();
 
     for f in &manifest.files {
         let rel = sanitize_relative_path(&f.relative_path)?;
-        let final_path = target_root.join(&rel);
+        let final_path = if is_resuming {
+            target_root.join(&rel)
+        } else {
+            get_unique_destination_path(&target_root, &rel, &mut used_destination_paths)
+        };
         downloaded_file_paths.push(final_path.to_string_lossy().to_string());
         if let Some(parent) = final_path.parent() {
             std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
@@ -1376,7 +1424,7 @@ async fn run_outgoing_session(
     if let (Some(ip), Some(port)) = (&fresh_contact.last_known_ip, fresh_contact.last_known_port) {
         let target_addr = format!("{ip}:{port}");
         if let Ok(Ok(tcp_stream)) = tokio::time::timeout(
-            Duration::from_millis(1200),
+            Duration::from_millis(600),
             TcpStream::connect(&target_addr),
         )
         .await
@@ -1410,9 +1458,17 @@ async fn run_outgoing_session(
         .ok_or_else(|| "Cannot reach peer on LAN and WAN Signaling Server is not connected".to_string())?;
 
     let stun_addr = state.settings.lock().unwrap().stun_addr.clone();
-    let my_wan = discover_wan_reflexive_address(state.listen_port, &stun_addr)
-        .await
-        .or_else(|| state.wan_reflexive_addr.lock().unwrap().clone());
+    let my_wan = state.wan_reflexive_addr.lock().unwrap().clone();
+    if my_wan.is_none() {
+        let state_c = state.clone();
+        let port = state.listen_port;
+        let s_addr = stun_addr.clone();
+        tokio::spawn(async move {
+            if let Some(refl) = discover_wan_reflexive_address(port, &s_addr).await {
+                *state_c.wan_reflexive_addr.lock().unwrap() = Some(refl);
+            }
+        });
+    }
     let my_lan = collect_all_lan_addresses(state.listen_port);
     let my_alias = state.settings.lock().unwrap().alias_name.clone();
 
@@ -1437,17 +1493,27 @@ async fn run_outgoing_session(
     let _ = signaling_tx.send(intent_msg);
 
     if let Ok(Ok(answer)) = tokio::time::timeout(Duration::from_millis(3500), cand_rx).await {
-        // 2a. Try Peer's LAN Candidates via Direct TCP first (works when both PCs are on the same Wi-Fi/LAN)
-        for lan_cand in &answer.lan_candidates {
-            if let Ok(Ok(tcp_stream)) = tokio::time::timeout(
-                Duration::from_millis(1200),
-                TcpStream::connect(lan_cand),
-            )
-            .await
-            {
+        // 2a. Try Peer's LAN Candidates via Direct TCP in parallel (Happy Eyeballs race)
+        if !answer.lan_candidates.is_empty() {
+            let mut connect_futs = Vec::new();
+            for lan_cand in &answer.lan_candidates {
+                let cand_str = lan_cand.clone();
+                connect_futs.push(Box::pin(async move {
+                    let stream = tokio::time::timeout(
+                        Duration::from_millis(1500),
+                        TcpStream::connect(&cand_str),
+                    )
+                    .await
+                    .map_err(|_| "timeout".to_string())?
+                    .map_err(|e| e.to_string())?;
+                    Ok::<(TcpStream, String), String>((stream, cand_str))
+                }));
+            }
+
+            if let Ok(((tcp_stream, connected_addr), _)) = futures_util::future::select_ok(connect_futs).await {
                 let _ = tcp_stream.set_nodelay(true);
                 let (reader, writer) = tokio::io::split(tcp_stream);
-                if let Ok(sock_addr) = lan_cand.parse::<SocketAddr>() {
+                if let Ok(sock_addr) = connected_addr.parse::<SocketAddr>() {
                     let _ = state.db.update_contact_lan(&fresh_contact.device_id, &sock_addr.ip().to_string(), sock_addr.port());
                 }
                 return stream_outgoing_files(

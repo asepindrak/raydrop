@@ -314,7 +314,8 @@
   function resolveLocalFilePath(
     f: ChatFileItem,
     isOutgoing: boolean,
-    linkedTransfer?: TransferRecord
+    linkedTransfer?: TransferRecord,
+    fileIdx?: number
   ): string | null {
     if (isOutgoing && f.path) {
       return f.path;
@@ -327,6 +328,12 @@
           (p) => getBaseName(p).toLowerCase() === f.name.toLowerCase()
         );
         if (match) return match;
+        if (fileIdx !== undefined && paths[fileIdx]) {
+          return paths[fileIdx];
+        }
+        if (paths.length === 1) {
+          return paths[0];
+        }
       }
 
       const dir = linkedTransfer.target_path || $appSettings.download_dir;
@@ -809,9 +816,9 @@
                     </div>
 
                     <div class="space-y-2">
-                      {#each files as f}
+                      {#each files as f, fileIdx}
                         {@const badge = getFileTypeBadge(f.name)}
-                        {@const localPath = resolveLocalFilePath(f, isOutgoing, linkedTransfer)}
+                        {@const localPath = resolveLocalFilePath(f, isOutgoing, linkedTransfer, fileIdx)}
                         {@const isImageFile = badge.isImage}
                         {@const thumbSrc = f.thumbnail || (localPath ? localThumbnails[localPath] : null)}
 

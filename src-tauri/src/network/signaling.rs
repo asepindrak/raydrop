@@ -147,10 +147,17 @@ async fn handle_signaling_message(app: &AppHandle, state: &Arc<AppState>, text: 
                 .and_then(|v| v.as_str())
                 .map(|s| s.to_string());
 
-            let stun_addr = state.settings.lock().unwrap().stun_addr.clone();
-            let my_wan = discover_wan_reflexive_address(state.listen_port, &stun_addr)
-                .await
-                .or_else(|| state.wan_reflexive_addr.lock().unwrap().clone());
+            let my_wan = state.wan_reflexive_addr.lock().unwrap().clone();
+            if my_wan.is_none() {
+                let state_c = state.clone();
+                let port = state.listen_port;
+                let s_addr = state.settings.lock().unwrap().stun_addr.clone();
+                tokio::spawn(async move {
+                    if let Some(refl) = discover_wan_reflexive_address(port, &s_addr).await {
+                        *state_c.wan_reflexive_addr.lock().unwrap() = Some(refl);
+                    }
+                });
+            }
 
             let my_lan = crate::network::transport::collect_all_lan_addresses(state.listen_port);
 

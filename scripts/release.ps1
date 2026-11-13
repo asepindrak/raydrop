@@ -142,6 +142,8 @@ $bodyText = @"
 - **Windows Portable App (`.exe` — Standalone / No Install):** \`Raydrop_${ver}_x64-portable.exe\`
 
 ### Features & Highlights
+- **Auto-Incremental Duplicate File Downloads:** Sending a file with a name that was previously downloaded now automatically appends a clean increment number (`filename (1).ext`, `filename (2).ext`), preventing overwrite/false completion and ensuring newly sent files always download seamlessly.
+- **Ultra-Fast Realtime File Receive Popup:** Eliminated synchronous blocking STUN discovery from handshake path and added parallel concurrent Happy Eyeballs candidate race, making incoming transfer request modals appear instantaneously in real-time.
 - **Markdown Formatted Release Notes:** In-app update notifications and release dialogs now render rich markdown styling (headings, lists, code blocks, links) with automatic external browser launching.
 - **Scrollable Settings Modal:** Redesigned Configuration/Settings dialog with bounded max-height, smooth scrollview, and pinned action bar to prevent overflow on smaller screens and laptop displays.
 - **Integrated P2P Encrypted Chat:** Real-time end-to-end encrypted messaging with contacts and peers across local LAN & remote WAN with zero server storage.
