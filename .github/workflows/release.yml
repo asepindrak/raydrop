@@ -16,11 +16,11 @@ jobs:
       matrix:
         include:
           - platform: 'windows-latest'
-            args: ''
+            args: '--bundles msi'
           - platform: 'ubuntu-22.04'
-            args: ''
+            args: '--bundles deb,appimage'
           - platform: 'macos-latest'
-            args: '--target universal-apple-darwin'
+            args: '--target universal-apple-darwin --bundles dmg'
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -59,7 +59,7 @@ jobs:
         with:
           tagName: v__VERSION__
           releaseName: 'Raydrop v__VERSION__'
-          releaseBody: '### Raydrop Universal P2P File Transfer (v__VERSION__)\n\nDownload the installer for your operating system below:\n- **Windows (x64):** `Raydrop___VERSION___x64-setup.exe` or `.msi`\n- **macOS (Universal):** `Raydrop___VERSION___universal.dmg`\n- **Linux (x64):** `.deb` or `.AppImage`\n\nIncludes:\n- Cloud Account Login & Multi-Device Tailnet (`My Devices`)\n- Persistent Cloud Contacts by Email\n- Autorun at OS Startup (Starts Minimized in System Tray)\n- Native OS Right-Click ("Send with Raydrop")'
+          releaseBody: '### Raydrop Universal P2P File Transfer (v__VERSION__)\n\nDownload the installer for your operating system below:\n- **Windows (x64):** `Raydrop___VERSION___x64_en-US.msi`\n- **macOS (Universal):** `Raydrop___VERSION___universal.dmg`\n- **Linux (x64):** `.deb` or `.AppImage`\n\nFeatures:\n- Zero-Server P2P High-Speed File Transfer (LAN + Tailscale + WAN Relay)\n- End-to-End Encrypted Real-Time Chat\n- 6-Stream Parallel Chunk Acceleration\n- Keepalive Heartbeats & Auto-Resume'
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
