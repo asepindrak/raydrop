@@ -22,15 +22,16 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-
       - name: Setup Android NDK
         uses: nttld/setup-ndk@v1
         id: setup-ndk
         with:
           ndk-version: r26d
           link-to-sdk: true
+
+      - name: Accept Android SDK Licenses
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses 2>/dev/null || true
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -55,11 +56,13 @@ jobs:
         run: npx @tauri-apps/cli android init --ci
         env:
           NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
+          ANDROID_HOME: ${{ env.ANDROID_HOME || '/usr/local/lib/android/sdk' }}
 
       - name: Build Android APK (ARM64)
-        run: npx @tauri-apps/cli android build --apk --target aarch64
+        run: npx @tauri-apps/cli android build --apk --target aarch64 --ci
         env:
           NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
+          ANDROID_HOME: ${{ env.ANDROID_HOME || '/usr/local/lib/android/sdk' }}
 
       - name: Locate and Collect APK
         run: |
