@@ -2,7 +2,6 @@
   import { open } from '@tauri-apps/plugin-dialog';
   import { activeTransfers, historicalTransfers } from '../stores/transfers';
   import { appSettings, cliQueuedFiles, activeMainTab } from '../stores/state';
-  import { contacts, lanContacts } from '../stores/contacts';
   import { raydropApi, formatBytes, type TransferRecord, type WebShareInfo } from '../utils/tauri-ipc';
   import WebShareModal from './WebShareModal.svelte';
   import ClipboardShareModal from './ClipboardShareModal.svelte';
@@ -157,8 +156,6 @@
     .filter((t) => t.status === 'in_progress')
     .reduce((sum, t) => sum + (t.speed_mbps || 0), 0);
 
-  $: onlinePeers = $contacts.filter((c) => c.is_online);
-
   async function handlePickFiles() {
     try {
       const picked = await open({
@@ -207,21 +204,6 @@
       }
     } catch (e: any) {
       actionError = e?.toString() || 'Failed to start Web Share';
-    }
-  }
-
-  async function handleQuickSendToPeer(peerDeviceId: string) {
-    try {
-      const picked = await open({
-        multiple: true,
-        title: 'Select Files to Send',
-      });
-      if (picked) {
-        const list = Array.isArray(picked) ? picked : [picked];
-        await raydropApi.initiateTransfer(peerDeviceId, list);
-      }
-    } catch (e: any) {
-      actionError = e?.toString() || 'Failed to send to peer';
     }
   }
 
@@ -319,18 +301,18 @@
       </button>
     </div>
 
-    <!-- Quick Drop & Online Peers Hub -->
+    <!-- Drop Zone Hub -->
     <button
       type="button"
       on:click={handlePickFiles}
-      class="flex-1 max-w-2xl px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl border border-dashed border-slate-700/80 hover:border-cyan-500/60 bg-slate-900/40 hover:bg-slate-900/80 transition-all cursor-pointer flex items-center justify-between gap-3 text-xs text-slate-400 group text-left"
+      class="flex-1 min-w-0 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl border border-dashed border-slate-700/80 hover:border-cyan-500/60 bg-slate-900/40 hover:bg-slate-900/80 transition-all cursor-pointer flex items-center justify-between gap-3 text-xs text-slate-400 group text-left"
       title="Click or drag files here to send"
     >
       <div class="flex items-center gap-2 sm:gap-2.5 min-w-0">
         <div class="w-7 h-7 rounded-lg bg-cyan-500/10 group-hover:bg-cyan-500/20 text-cyan-400 flex items-center justify-center shrink-0 transition-colors">
           <Upload class="w-4 h-4" />
         </div>
-        <div class="truncate">
+        <div class="truncate min-w-0">
           <span class="text-slate-200 font-semibold group-hover:text-cyan-300 transition-colors">
             Drop files or folders here
           </span>
@@ -344,24 +326,6 @@
         </span>
       </div>
     </button>
-
-    <!-- Quick Online Peers Shortcut -->
-    {#if onlinePeers.length > 0}
-      <div class="hidden xl:flex items-center gap-1.5 shrink-0 text-xs">
-        <span class="text-slate-500 font-medium">Quick Send:</span>
-        {#each onlinePeers.slice(0, 2) as peer}
-          <button
-            type="button"
-            on:click={() => handleQuickSendToPeer(peer.device_id)}
-            class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-800/70 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-white transition-colors"
-            title="Send files directly to {peer.alias_name}"
-          >
-            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-            <span class="font-semibold truncate max-w-[100px]">{peer.alias_name}</span>
-          </button>
-        {/each}
-      </div>
-    {/if}
   </div>
 
   <!-- Filter Ribbon & Aggregate Metrics -->
