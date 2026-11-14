@@ -1,5 +1,6 @@
 use image::{Rgba, RgbaImage};
 use std::io::Cursor;
+#[allow(unused_imports)]
 use tauri::{AppHandle, Manager};
 
 // 3x5 bitmap glyphs for digits 0-9 and '+'

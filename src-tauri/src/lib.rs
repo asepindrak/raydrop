@@ -81,6 +81,7 @@ pub fn run() {
         active_web_share: Mutex::new(None),
     });
 
+    #[cfg(desktop)]
     let state_for_single_instance = app_state.clone();
     let state_for_setup = app_state.clone();
 

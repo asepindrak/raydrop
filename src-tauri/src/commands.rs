@@ -626,6 +626,7 @@ pub fn open_file_path(app: AppHandle, path: String) -> Result<(), String> {
         return Err(format!("File or folder not found: {path}"));
     }
 
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
     if let Some(w) = app.get_webview_window("main") {
         let _ = w.set_always_on_top(false);
     }
@@ -658,6 +659,7 @@ pub fn open_file_path(app: AppHandle, path: String) -> Result<(), String> {
 pub fn open_folder_path(app: AppHandle, path: String) -> Result<(), String> {
     let p = std::path::PathBuf::from(&path);
 
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
     if let Some(w) = app.get_webview_window("main") {
         let _ = w.set_always_on_top(false);
     }
