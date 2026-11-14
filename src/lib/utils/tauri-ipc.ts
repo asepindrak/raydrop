@@ -123,11 +123,18 @@ export interface ChatMessage {
   peer_device_id: string;
   direction: 'incoming' | 'outgoing';
   content: string;
-  msg_type: 'text' | 'file_transfer';
+  msg_type: 'text' | 'file_transfer' | 'clipboard' | string;
   transfer_session_id?: string | null;
   files_json?: string | null;
   is_read: boolean;
   created_at: number;
+}
+
+export interface ClipboardSyncedPayload {
+  from_device_id: string;
+  sender_alias: string;
+  content: string;
+  auto_copied: boolean;
 }
 
 export interface WebShareItem {
@@ -285,6 +292,14 @@ export const raydropApi = {
   startWebShare: (paths: string[]) =>
     invoke<WebShareInfo>('start_web_share', { paths }),
   stopWebShare: () => invoke<void>('stop_web_share'),
+  readSystemClipboard: () => invoke<string>('read_system_clipboard'),
+  writeSystemClipboard: (text: string) =>
+    invoke<void>('write_system_clipboard', { text }),
+  broadcastClipboard: (content: string, targetDeviceIds?: string[]) =>
+    invoke<number>('broadcast_clipboard', {
+      content,
+      targetDeviceIds: targetDeviceIds ?? null,
+    }),
   listenEvent: <T>(event: string, handler: (payload: T) => void): Promise<UnlistenFn> =>
     listen<T>(event, (e) => handler(e.payload)),
 };

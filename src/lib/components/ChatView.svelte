@@ -32,7 +32,8 @@
     ShieldAlert,
     ShieldCheck,
     Ban,
-    Image as ImageIcon
+    Image as ImageIcon,
+    Clipboard,
   } from 'lucide-svelte';
   import { contacts, lanContacts } from '../stores/contacts';
   import { cloudContacts, cloudMyDevices, activeChatPeerId, appSettings, incomingRequestQueue, activeMainTab } from '../stores/state';
@@ -805,6 +806,13 @@
                     <Copy class="w-3 h-3" />
                   {/if}
                 </button>
+
+                {#if msg.msg_type === 'clipboard'}
+                  <div class="mb-1.5 flex items-center gap-1 text-[10px] font-mono font-bold text-indigo-400">
+                    <Clipboard class="w-3 h-3" />
+                    <span>Universal Clipboard</span>
+                  </div>
+                {/if}
 
                 <!-- Markdown Content -->
                 {#if hasContent}

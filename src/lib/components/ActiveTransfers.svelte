@@ -5,6 +5,7 @@
   import { contacts, lanContacts } from '../stores/contacts';
   import { raydropApi, formatBytes, type TransferRecord, type WebShareInfo } from '../utils/tauri-ipc';
   import WebShareModal from './WebShareModal.svelte';
+  import ClipboardShareModal from './ClipboardShareModal.svelte';
   import {
     ArrowUpRight,
     ArrowDownLeft,
@@ -32,6 +33,7 @@
     Copy,
     Check,
     QrCode,
+    Clipboard,
   } from 'lucide-svelte';
 
   let resumingId = '';
@@ -40,6 +42,7 @@
   let transferFilter: 'all' | 'incoming' | 'outgoing' = 'all';
   let isDraggingOver = false;
   let webShareInfo: WebShareInfo | null = null;
+  let showClipboardModal = false;
 
   function toggleExpanded(id: string) {
     expandedTransferIds = {
@@ -283,6 +286,16 @@
       >
         <QrCode class="w-4 h-4 text-purple-200" />
         <span>Share to Phone</span>
+      </button>
+
+      <button
+        type="button"
+        on:click={() => (showClipboardModal = true)}
+        class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600/80 to-purple-600/80 hover:from-indigo-500 hover:to-purple-500 text-white font-semibold text-sm border border-indigo-500/30 transition-all hover:-translate-y-0.5 shadow-lg shadow-indigo-500/20"
+        title="Sync text, links, or code directly to your other devices' clipboard"
+      >
+        <Clipboard class="w-4 h-4 text-indigo-200" />
+        <span>Sync Clipboard</span>
       </button>
     </div>
 
@@ -652,7 +665,16 @@
               class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 text-purple-200 text-xs font-semibold border border-purple-500/40 transition"
             >
               <QrCode class="w-4 h-4 text-purple-300" />
-              <span>Share to Phone (QR Code)</span>
+              <span>Share to Phone</span>
+            </button>
+
+            <button
+              type="button"
+              on:click={() => (showClipboardModal = true)}
+              class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-200 text-xs font-semibold border border-indigo-500/40 transition"
+            >
+              <Clipboard class="w-4 h-4 text-indigo-300" />
+              <span>Sync Clipboard</span>
             </button>
           </div>
         </div>
@@ -793,6 +815,14 @@
       shareInfo={webShareInfo}
       onClose={() => {
         webShareInfo = null;
+      }}
+    />
+  {/if}
+
+  {#if showClipboardModal}
+    <ClipboardShareModal
+      onClose={() => {
+        showClipboardModal = false;
       }}
     />
   {/if}

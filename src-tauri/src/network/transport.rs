@@ -48,6 +48,63 @@ pub fn format_bytes_human(bytes: u64) -> String {
     }
 }
 
+pub fn process_incoming_clipboard_if_trusted(
+    app: &AppHandle,
+    state: &Arc<AppState>,
+    sender_device_id: &str,
+    content: &str,
+) {
+    let contact_res = state.db.get_contact(sender_device_id);
+    let (is_trusted, sender_alias) = match contact_res {
+        Ok(Some(c)) => (
+            c.is_own_device || c.trust_level == "trusted_auto_accept",
+            c.alias_name,
+        ),
+        _ => (false, sender_device_id.to_string()),
+    };
+
+    let preview = if content.chars().count() > 60 {
+        format!("{}...", content.chars().take(60).collect::<String>())
+    } else {
+        content.to_string()
+    };
+
+    if is_trusted {
+        if let Ok(mut cb) = arboard::Clipboard::new() {
+            let _ = cb.set_text(content);
+        }
+        notify_os(
+            app,
+            "📋 Clipboard Synced",
+            &format!("Copied from {sender_alias}: {preview}"),
+        );
+        let _ = app.emit(
+            "clipboard_synced",
+            serde_json::json!({
+                "from_device_id": sender_device_id,
+                "sender_alias": sender_alias,
+                "content": content,
+                "auto_copied": true
+            }),
+        );
+    } else {
+        notify_os(
+            app,
+            "📋 Clipboard Received",
+            &format!("From {sender_alias}: {preview}"),
+        );
+        let _ = app.emit(
+            "clipboard_synced",
+            serde_json::json!({
+                "from_device_id": sender_device_id,
+                "sender_alias": sender_alias,
+                "content": content,
+                "auto_copied": false
+            }),
+        );
+    }
+}
+
 /// Forcefully pops up and focuses the main Raydrop window on the Win32 main UI thread,
 /// even if the app was minimized in the System Tray or behind another foreground application.
 pub fn popup_and_focus_main_window(app: &AppHandle) {
@@ -619,7 +676,7 @@ where
 
                         let chat_msg = crate::db::storage::ChatMessage {
                             id: msg_id,
-                            peer_device_id: from_device_id,
+                            peer_device_id: from_device_id.clone(),
                             direction: "incoming".to_string(),
                             content,
                             msg_type,
@@ -633,6 +690,14 @@ where
                         if let Ok(counts) = state.db.get_unread_chat_counts() {
                             let total: u32 = counts.values().sum();
                             crate::tray_badge::update_tray_unread_badge(&app, total);
+                        }
+                        if chat_msg.msg_type == "clipboard" {
+                            process_incoming_clipboard_if_trusted(
+                                &app,
+                                &state,
+                                &from_device_id,
+                                &chat_msg.content,
+                            );
                         }
                         let _ = app.emit("chat_message_received", &chat_msg);
                         let _ = writer.write_all(b"OK").await;

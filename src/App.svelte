@@ -50,6 +50,7 @@
     type TransferRecord,
     type UpdateProgressPayload,
     type ChatMessage,
+    type ClipboardSyncedPayload,
   } from "./lib/utils/tauri-ipc";
 
   async function refreshCloudState(sigUrl: string, token: string | null) {
@@ -247,6 +248,26 @@
           await win.requestUserAttention(UserAttentionType.Informational);
         } catch (_) {}
       }
+    });
+
+    await raydropApi.listenEvent<ClipboardSyncedPayload>("clipboard_synced", async (payload) => {
+      const preview = payload.content.length > 50
+        ? payload.content.slice(0, 50) + "..."
+        : payload.content;
+      addChatToast(
+        {
+          id: "clip-" + Date.now(),
+          peer_device_id: payload.from_device_id,
+          direction: "incoming",
+          content: payload.auto_copied
+            ? `📋 [Auto-Copied] ${preview}`
+            : `📋 [Shared] ${preview}`,
+          msg_type: "clipboard",
+          is_read: true,
+          created_at: Math.floor(Date.now() / 1000),
+        },
+        payload.sender_alias
+      );
     });
 
     // Native OS Drag and Drop multiple files/folders listener

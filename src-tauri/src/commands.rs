@@ -1261,3 +1261,68 @@ pub fn stop_web_share(state: State<'_, Arc<AppState>>) -> Result<(), String> {
     Ok(())
 }
 
+#[tauri::command]
+pub fn read_system_clipboard() -> Result<String, String> {
+    let mut cb = arboard::Clipboard::new().map_err(|e| format!("Clipboard error: {e}"))?;
+    cb.get_text().map_err(|e| format!("Clipboard read error: {e}"))
+}
+
+#[tauri::command]
+pub fn write_system_clipboard(text: String) -> Result<(), String> {
+    let mut cb = arboard::Clipboard::new().map_err(|e| format!("Clipboard error: {e}"))?;
+    cb.set_text(text).map_err(|e| format!("Clipboard write error: {e}"))
+}
+
+#[tauri::command]
+pub fn broadcast_clipboard(
+    app: AppHandle,
+    state: State<'_, Arc<AppState>>,
+    content: String,
+    target_device_ids: Option<Vec<String>>,
+) -> Result<u32, String> {
+    if content.trim().is_empty() {
+        return Err("Clipboard text cannot be empty".to_string());
+    }
+
+    let targets: Vec<String> = if let Some(ids) = target_device_ids {
+        if !ids.is_empty() {
+            ids
+        } else {
+            let all = state.db.list_contacts().map_err(|e| e.to_string())?;
+            all.into_iter()
+                .filter(|c| c.is_own_device || c.trust_level == "trusted_auto_accept")
+                .map(|c| c.device_id)
+                .collect()
+        }
+    } else {
+        let all = state.db.list_contacts().map_err(|e| e.to_string())?;
+        all.into_iter()
+            .filter(|c| c.is_own_device || c.trust_level == "trusted_auto_accept")
+            .map(|c| c.device_id)
+            .collect()
+    };
+
+    if targets.is_empty() {
+        return Err("No trusted devices found. Add a contact or device first.".to_string());
+    }
+
+    let mut sent_count = 0;
+    for peer_id in targets {
+        if send_chat_message(
+            app.clone(),
+            state.clone(),
+            peer_id,
+            content.clone(),
+            Some("clipboard".to_string()),
+            None,
+            None,
+        )
+        .is_ok()
+        {
+            sent_count += 1;
+        }
+    }
+
+    Ok(sent_count)
+}
+

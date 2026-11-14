@@ -363,6 +363,14 @@ async fn handle_signaling_message(app: &AppHandle, state: &Arc<AppState>, text: 
                     let total: u32 = counts.values().sum();
                     crate::tray_badge::update_tray_unread_badge(app, total);
                 }
+                if chat_msg.msg_type == "clipboard" {
+                    crate::network::transport::process_incoming_clipboard_if_trusted(
+                        app,
+                        state,
+                        &from_device_id,
+                        &chat_msg.content,
+                    );
+                }
                 let _ = app.emit("chat_message_received", &chat_msg);
                 return;
             }
