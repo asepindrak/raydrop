@@ -112,17 +112,20 @@ pub fn popup_and_focus_main_window(app: &AppHandle) {
     let app_handle = app.clone();
     let _ = app.run_on_main_thread(move || {
         if let Some(w) = app_handle.get_webview_window("main") {
-            let _ = w.set_always_on_top(true);
             let _ = w.show();
-            let _ = w.unminimize();
             let _ = w.set_focus();
-            let _ = w.request_user_attention(Some(tauri::UserAttentionType::Critical));
-            let w_clone = w.clone();
-            tauri::async_runtime::spawn(async move {
-                tokio::time::sleep(Duration::from_millis(1800)).await;
-                let _ = w_clone.set_always_on_top(false);
-                let _ = w_clone.set_focus();
-            });
+            #[cfg(not(any(target_os = "android", target_os = "ios")))]
+            {
+                let _ = w.set_always_on_top(true);
+                let _ = w.unminimize();
+                let _ = w.request_user_attention(Some(tauri::UserAttentionType::Critical));
+                let w_clone = w.clone();
+                tauri::async_runtime::spawn(async move {
+                    tokio::time::sleep(Duration::from_millis(1800)).await;
+                    let _ = w_clone.set_always_on_top(false);
+                    let _ = w_clone.set_focus();
+                });
+            }
         }
     });
 }

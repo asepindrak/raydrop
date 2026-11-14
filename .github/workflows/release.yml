@@ -1,9 +1,10 @@
 name: Release Raydrop Desktop Installers
 
 on:
-  push:
-    tags:
-      - 'v*'
+  # Temporarily paused while finalizing Android CI build
+  # push:
+  #   tags:
+  #     - 'v*'
   workflow_dispatch:
 
 permissions:

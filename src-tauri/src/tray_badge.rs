@@ -199,25 +199,29 @@ pub fn render_badged_tray_icon(count: u32) -> Option<tauri::image::Image<'static
         .map(|img| img.to_owned())
 }
 
+#[allow(unused_variables)]
 pub fn update_tray_unread_badge(app: &AppHandle, count: u32) {
-    if let Some(tray) = app.tray_by_id("main_tray") {
-        if let Some(icon) = render_badged_tray_icon(count) {
-            let _ = tray.set_icon(Some(icon));
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    {
+        if let Some(tray) = app.tray_by_id("main_tray") {
+            if let Some(icon) = render_badged_tray_icon(count) {
+                let _ = tray.set_icon(Some(icon));
+            }
+
+            let tip = if count == 0 {
+                "Raydrop — Universal P2P File Transfer".to_string()
+            } else if count == 1 {
+                "Raydrop — 1 pesan belum dibaca".to_string()
+            } else {
+                format!("Raydrop — {} pesan belum dibaca", count)
+            };
+            let _ = tray.set_tooltip(Some(tip));
         }
 
-        let tip = if count == 0 {
-            "Raydrop — Universal P2P File Transfer".to_string()
-        } else if count == 1 {
-            "Raydrop — 1 pesan belum dibaca".to_string()
-        } else {
-            format!("Raydrop — {} pesan belum dibaca", count)
-        };
-        let _ = tray.set_tooltip(Some(tip));
-    }
-
-    // Also update Windows Taskbar badge count if supported
-    if let Some(win) = app.get_webview_window("main") {
-        let badge_val = if count == 0 { None } else { Some(count as i64) };
-        let _ = win.set_badge_count(badge_val);
+        // Also update Windows Taskbar badge count if supported
+        if let Some(win) = app.get_webview_window("main") {
+            let badge_val = if count == 0 { None } else { Some(count as i64) };
+            let _ = win.set_badge_count(badge_val);
+        }
     }
 }

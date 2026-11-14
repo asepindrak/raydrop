@@ -19,7 +19,9 @@ use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
 };
+#[allow(unused_imports)]
 use tauri::{Emitter, Manager, WindowEvent};
+#[allow(unused_imports)]
 use tracing::info;
 
 fn extract_send_paths(args: &[String]) -> Vec<String> {
@@ -243,6 +245,7 @@ pub fn run() {
 
             // Show & focus main window on startup (unless launched with --minimized at boot)
             if let Some(main_win) = app.get_webview_window("main") {
+                #[cfg(not(any(target_os = "android", target_os = "ios")))]
                 if let Ok(win_img) =
                     tauri::image::Image::from_bytes(include_bytes!("../icons/128x128.png"))
                 {
@@ -252,19 +255,23 @@ pub fn run() {
                     let _ = main_win.hide();
                 } else {
                     let _ = main_win.show();
+                    #[cfg(not(any(target_os = "android", target_os = "ios")))]
                     let _ = main_win.unminimize();
                     let _ = main_win.set_focus();
                     if !initial_send_paths.is_empty() {
                         crate::network::transport::popup_and_focus_main_window(&handle);
                     }
                 }
-                let win_clone = main_win.clone();
-                main_win.on_window_event(move |event| {
-                    if let WindowEvent::CloseRequested { api, .. } = event {
-                        api.prevent_close();
-                        let _ = win_clone.hide();
-                    }
-                });
+                #[cfg(not(any(target_os = "android", target_os = "ios")))]
+                {
+                    let win_clone = main_win.clone();
+                    main_win.on_window_event(move |event| {
+                        if let WindowEvent::CloseRequested { api, .. } = event {
+                            api.prevent_close();
+                            let _ = win_clone.hide();
+                        }
+                    });
+                }
             }
 
             // Start Background Networking Daemons (TCP + QUIC + mDNS + WAN Signaling/STUN)
