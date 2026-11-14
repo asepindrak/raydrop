@@ -68,10 +68,36 @@ jobs:
           NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
           ANDROID_HOME: ${{ env.ANDROID_HOME || '/usr/local/lib/android/sdk' }}
 
-      - name: Locate and Collect APK
+      - name: Sign and Align Android APK
         run: |
           mkdir -p build-output
-          find src-tauri/gen/android -name "*.apk" -exec cp {} build-output/Raydrop-arm64-v8a.apk \;
+          RAW_APK=$(find src-tauri/gen/android -name "*.apk" | head -n 1)
+          echo "Found generated raw APK: $RAW_APK"
+
+          keytool -genkeypair -v \
+            -keystore raydrop.keystore \
+            -alias raydrop \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -storepass raydrop123 \
+            -keypass raydrop123 \
+            -dname "CN=Raydrop, OU=Raydrop Team, O=Raydrop, L=Jakarta, ST=Jakarta, C=ID"
+
+          BUILD_TOOLS=$(ls -d $ANDROID_HOME/build-tools/* | sort -V | tail -n 1)
+          echo "Using Android build-tools: $BUILD_TOOLS"
+
+          $BUILD_TOOLS/zipalign -v -p 4 "$RAW_APK" aligned.apk
+
+          $BUILD_TOOLS/apksigner sign \
+            --ks raydrop.keystore \
+            --ks-pass pass:raydrop123 \
+            --ks-key-alias raydrop \
+            --key-pass pass:raydrop123 \
+            --out build-output/Raydrop-arm64-v8a.apk \
+            aligned.apk
+
+          $BUILD_TOOLS/apksigner verify --verbose build-output/Raydrop-arm64-v8a.apk
           ls -lah build-output
 
       - name: Upload APK Artifact
