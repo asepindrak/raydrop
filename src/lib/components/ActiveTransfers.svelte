@@ -185,7 +185,12 @@
         cliQueuedFiles.set([picked]);
       }
     } catch (e: any) {
-      actionError = e?.toString() || 'Failed to select folder';
+      const msg = e?.toString() || '';
+      if (msg.includes('FolderPickerNotImplemented') || /Android|iPhone|iPad/i.test(navigator.userAgent)) {
+        actionError = 'Android tidak mendukung pemilihan folder langsung karena sandbox keamanan OS. Silakan gunakan tombol "Send Files" untuk memilih banyak file sekaligus.';
+      } else {
+        actionError = msg || 'Failed to select folder';
+      }
     }
   }
 

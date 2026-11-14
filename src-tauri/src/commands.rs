@@ -652,6 +652,12 @@ pub fn open_file_path(app: AppHandle, path: String) -> Result<(), String> {
             .map_err(|e| format!("Failed to open file: {e}"))?;
     }
 
+    #[cfg(target_os = "android")]
+    {
+        use tauri::Emitter;
+        let _ = app.emit("open_file_requested", &path);
+    }
+
     Ok(())
 }
 
@@ -764,6 +770,19 @@ pub fn open_folder_path(app: AppHandle, path: String) -> Result<(), String> {
             .arg(&dir_to_open)
             .spawn()
             .map_err(|e| format!("Failed to open folder: {e}"))?;
+    }
+
+    #[cfg(target_os = "android")]
+    {
+        use tauri::Emitter;
+        let folder_path = if p.is_dir() {
+            path.clone()
+        } else if let Some(parent) = p.parent() {
+            parent.to_string_lossy().to_string()
+        } else {
+            path.clone()
+        };
+        let _ = app.emit("open_folder_requested", &folder_path);
     }
 
     Ok(())
@@ -1277,12 +1296,59 @@ pub fn stop_web_share(state: State<'_, Arc<AppState>>) -> Result<(), String> {
     Ok(())
 }
 
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
+pub fn read_clipboard_content() -> Result<String, String> {
+    let mut cb = arboard::Clipboard::new().map_err(|e| format!("Clipboard error: {e}"))?;
+    if let Ok(text) = cb.get_text() {
+        if !text.trim().is_empty() {
+            return Ok(text);
+        }
+    }
+    if let Ok(img) = cb.get_image() {
+        use image::ImageBuffer;
+        let width = img.width as u32;
+        let height = img.height as u32;
+        if let Some(buf) = ImageBuffer::<image::Rgba<u8>, _>::from_raw(width, height, img.bytes.into_owned()) {
+            let mut png_bytes = Vec::new();
+            let mut cursor = std::io::Cursor::new(&mut png_bytes);
+            if buf.write_to(&mut cursor, image::ImageFormat::Png).is_ok() {
+                use base64::Engine;
+                let b64 = base64::engine::general_purpose::STANDARD.encode(&png_bytes);
+                return Ok(format!("data:image/png;base64,{b64}"));
+            }
+        }
+    }
+    cb.get_text().map_err(|e| format!("Clipboard read error: {e}"))
+}
+
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
+pub fn write_clipboard_content(content: &str) -> Result<(), String> {
+    let mut cb = arboard::Clipboard::new().map_err(|e| format!("Clipboard error: {e}"))?;
+    if content.starts_with("data:image/") {
+        if let Some(comma_pos) = content.find(',') {
+            let b64_str = &content[comma_pos + 1..];
+            use base64::Engine;
+            if let Ok(png_bytes) = base64::engine::general_purpose::STANDARD.decode(b64_str) {
+                if let Ok(dyn_img) = image::load_from_memory(&png_bytes) {
+                    let rgba = dyn_img.to_rgba8();
+                    let img_data = arboard::ImageData {
+                        width: rgba.width() as usize,
+                        height: rgba.height() as usize,
+                        bytes: std::borrow::Cow::Owned(rgba.into_raw()),
+                    };
+                    return cb.set_image(img_data).map_err(|e| format!("Clipboard set image error: {e}"));
+                }
+            }
+        }
+    }
+    cb.set_text(content.to_string()).map_err(|e| format!("Clipboard write error: {e}"))
+}
+
 #[tauri::command]
 pub fn read_system_clipboard() -> Result<String, String> {
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
     {
-        let mut cb = arboard::Clipboard::new().map_err(|e| format!("Clipboard error: {e}"))?;
-        cb.get_text().map_err(|e| format!("Clipboard read error: {e}"))
+        read_clipboard_content()
     }
     #[cfg(any(target_os = "android", target_os = "ios"))]
     {
@@ -1291,15 +1357,14 @@ pub fn read_system_clipboard() -> Result<String, String> {
 }
 
 #[tauri::command]
-pub fn write_system_clipboard(text: String) -> Result<(), String> {
+pub fn write_system_clipboard(content: String) -> Result<(), String> {
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
     {
-        let mut cb = arboard::Clipboard::new().map_err(|e| format!("Clipboard error: {e}"))?;
-        cb.set_text(text).map_err(|e| format!("Clipboard write error: {e}"))
+        write_clipboard_content(&content)
     }
     #[cfg(any(target_os = "android", target_os = "ios"))]
     {
-        let _ = text;
+        let _ = content;
         Ok(())
     }
 }

@@ -391,6 +391,11 @@
 
   async function handlePickFolder() {
     try {
+      const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
+      if (isMobile) {
+        // Fallback to picking multiple files on mobile
+        return handlePickFiles();
+      }
       const picked = await open({
         directory: true,
         multiple: false,

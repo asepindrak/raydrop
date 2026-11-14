@@ -253,9 +253,20 @@
     });
 
     await raydropApi.listenEvent<ClipboardSyncedPayload>("clipboard_synced", async (payload) => {
-      const preview = payload.content.length > 50
+      const isImg = payload.content.startsWith("data:image/") || (payload as any).is_image;
+      const preview = isImg
+        ? "🖼️ [Gambar Clipboard - Siap di-Paste (Ctrl+V)]"
+        : payload.content.length > 50
         ? payload.content.slice(0, 50) + "..."
         : payload.content;
+
+      // Ensure system clipboard also receives text if supported on Web / WebView
+      if (!isImg && navigator.clipboard && navigator.clipboard.writeText) {
+        try {
+          await navigator.clipboard.writeText(payload.content);
+        } catch (_) {}
+      }
+
       addChatToast(
         {
           id: "clip-" + Date.now(),
@@ -269,6 +280,36 @@
           created_at: Math.floor(Date.now() / 1000),
         },
         payload.sender_alias
+      );
+    });
+
+    await raydropApi.listenEvent<string>("open_file_requested", (filePath) => {
+      addChatToast(
+        {
+          id: "open-file-" + Date.now(),
+          peer_device_id: "local",
+          direction: "incoming",
+          content: `📁 File berada di: ${filePath}. Buka aplikasi Files / Galeri untuk membukanya.`,
+          msg_type: "text",
+          is_read: true,
+          created_at: Math.floor(Date.now() / 1000),
+        },
+        "Raydrop Storage"
+      );
+    });
+
+    await raydropApi.listenEvent<string>("open_folder_requested", (folderPath) => {
+      addChatToast(
+        {
+          id: "open-folder-" + Date.now(),
+          peer_device_id: "local",
+          direction: "incoming",
+          content: `📁 File tersimpan di folder Download (${folderPath}). Buka aplikasi Files / Pengelola File untuk mengaksesnya.`,
+          msg_type: "text",
+          is_read: true,
+          created_at: Math.floor(Date.now() / 1000),
+        },
+        "Raydrop Storage"
       );
     });
 

@@ -55,55 +55,40 @@ pub fn process_incoming_clipboard_if_trusted(
     content: &str,
 ) {
     let contact_res = state.db.get_contact(sender_device_id);
-    let (is_trusted, sender_alias) = match contact_res {
-        Ok(Some(c)) => (
-            c.is_own_device || c.trust_level == "trusted_auto_accept",
-            c.alias_name,
-        ),
-        _ => (false, sender_device_id.to_string()),
+    let sender_alias = match contact_res {
+        Ok(Some(c)) => c.alias_name,
+        _ => sender_device_id.to_string(),
     };
 
-    let preview = if content.chars().count() > 60 {
+    let is_image = content.starts_with("data:image/");
+    let preview = if is_image {
+        "🖼️ Image".to_string()
+    } else if content.chars().count() > 60 {
         format!("{}...", content.chars().take(60).collect::<String>())
     } else {
         content.to_string()
     };
 
-    if is_trusted {
-        #[cfg(not(any(target_os = "android", target_os = "ios")))]
-        if let Ok(mut cb) = arboard::Clipboard::new() {
-            let _ = cb.set_text(content);
-        }
-        notify_os(
-            app,
-            "📋 Clipboard Synced",
-            &format!("Copied from {sender_alias}: {preview}"),
-        );
-        let _ = app.emit(
-            "clipboard_synced",
-            serde_json::json!({
-                "from_device_id": sender_device_id,
-                "sender_alias": sender_alias,
-                "content": content,
-                "auto_copied": true
-            }),
-        );
-    } else {
-        notify_os(
-            app,
-            "📋 Clipboard Received",
-            &format!("From {sender_alias}: {preview}"),
-        );
-        let _ = app.emit(
-            "clipboard_synced",
-            serde_json::json!({
-                "from_device_id": sender_device_id,
-                "sender_alias": sender_alias,
-                "content": content,
-                "auto_copied": false
-            }),
-        );
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    {
+        let _ = crate::commands::write_clipboard_content(content);
     }
+
+    notify_os(
+        app,
+        "📋 Clipboard Synced",
+        &format!("From {sender_alias}: {preview} (Ready to Paste)"),
+    );
+    let _ = app.emit(
+        "clipboard_synced",
+        serde_json::json!({
+            "from_device_id": sender_device_id,
+            "sender_alias": sender_alias,
+            "content": content,
+            "is_image": is_image,
+            "auto_copied": true
+        }),
+    );
 }
 
 /// Forcefully pops up and focuses the main Raydrop window on the Win32 main UI thread,
@@ -1337,16 +1322,91 @@ where
     Ok(())
 }
 
-fn extract_clean_filename(raw: &str, next_id: u32) -> String {
-    let unescaped = raw.replace("%20", " ");
+fn decode_percent_encoded_str(s: &str) -> String {
+    let mut result = Vec::new();
+    let bytes = s.as_bytes();
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'%' && i + 2 < bytes.len() {
+            if let Ok(val) = u8::from_str_radix(std::str::from_utf8(&bytes[i + 1..i + 3]).unwrap_or(""), 16) {
+                result.push(val);
+                i += 3;
+                continue;
+            }
+        }
+        result.push(bytes[i]);
+        i += 1;
+    }
+    String::from_utf8_lossy(&result).to_string()
+}
+
+fn detect_extension_from_magic_bytes(bytes: &[u8]) -> &'static str {
+    if bytes.len() >= 3 && bytes[0..3] == [0xFF, 0xD8, 0xFF] {
+        return "jpg";
+    }
+    if bytes.len() >= 8 && bytes[0..8] == [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A] {
+        return "png";
+    }
+    if bytes.len() >= 4 && (&bytes[0..4] == b"GIF8" || &bytes[0..4] == b"GIF7") {
+        return "gif";
+    }
+    if bytes.len() >= 12 && &bytes[0..4] == b"RIFF" && &bytes[8..12] == b"WEBP" {
+        return "webp";
+    }
+    if bytes.len() >= 4 && &bytes[0..4] == b"%PDF" {
+        return "pdf";
+    }
+    if bytes.len() >= 4 && &bytes[0..4] == [0x50, 0x4B, 0x03, 0x04] {
+        return "zip";
+    }
+    if bytes.len() >= 8 && &bytes[4..8] == b"ftyp" {
+        return "mp4";
+    }
+    if bytes.len() >= 3 && (&bytes[0..3] == b"ID3" || (bytes[0] == 0xFF && (bytes[1] & 0xE0) == 0xE0)) {
+        return "mp3";
+    }
+    if bytes.len() >= 12 && &bytes[0..4] == b"RIFF" && &bytes[8..12] == b"WAVE" {
+        return "wav";
+    }
+    if bytes.len() >= 4 && &bytes[0..4] == b"OggS" {
+        return "ogg";
+    }
+    if bytes.len() >= 4 && bytes[0..4] == [0x1A, 0x45, 0xDF, 0xA3] {
+        return "mkv";
+    }
+    "bin"
+}
+
+fn extract_clean_filename(raw: &str, bytes: &[u8], next_id: u32) -> String {
+    let unescaped = decode_percent_encoded_str(raw);
     let last_seg = unescaped.rsplit('/').next().unwrap_or("");
     let name_part = last_seg.rsplit(':').next().unwrap_or(last_seg);
     let trimmed = name_part.trim();
+
+    // Check if the URI already has a clean filename with extension
     if !trimmed.is_empty() && trimmed.contains('.') {
-        trimmed.to_string()
-    } else {
-        format!("file_{next_id}.bin")
+        let ext = trimmed.rsplit('.').next().unwrap_or("");
+        if ext.len() >= 2 && ext.len() <= 5 && ext.chars().all(|c| c.is_ascii_alphanumeric()) {
+            return trimmed.to_string();
+        }
     }
+
+    // Otherwise, deduce the extension from magic bytes!
+    let ext = detect_extension_from_magic_bytes(bytes);
+    let prefix = match ext {
+        "jpg" | "png" | "gif" | "webp" => "Image",
+        "mp4" | "mkv" => "Video",
+        "mp3" | "wav" | "ogg" => "Audio",
+        "pdf" | "zip" => "Document",
+        _ => "File",
+    };
+
+    let now_ts = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+
+    format!("{prefix}_{now_ts}_{next_id}.{ext}")
 }
 
 fn resolve_android_content_uri(
@@ -1368,7 +1428,7 @@ fn resolve_android_content_uri(
     let cache_dir = crate::db::storage::resolve_app_data_dir()?.join("transfer_cache");
     let _ = std::fs::create_dir_all(&cache_dir);
 
-    let clean_name = extract_clean_filename(uri_str, next_id);
+    let clean_name = extract_clean_filename(uri_str, &bytes, next_id);
     let target = cache_dir.join(&clean_name);
     std::fs::write(&target, &bytes)
         .map_err(|e| format!("Failed to cache Android content file to '{target:?}': {e}"))?;

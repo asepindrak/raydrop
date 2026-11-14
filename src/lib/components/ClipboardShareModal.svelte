@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   import { contacts, lanContacts } from '../stores/contacts';
   import { raydropApi } from '../utils/tauri-ipc';
   import {
@@ -16,6 +16,7 @@
     ShieldCheck,
     RefreshCw,
     ExternalLink,
+    Image as ImageIcon,
   } from 'lucide-svelte';
 
   export let onClose: () => void;
@@ -27,14 +28,41 @@
   let statusType: 'success' | 'error' | '' = '';
   let readingClipboard = false;
 
-  $: isUrl = /^https?:\/\/\S+/i.test(textContent.trim());
+  $: isImage = textContent.startsWith('data:image/');
+  $: isUrl = !isImage && /^https?:\/\/\S+/i.test(textContent.trim());
 
   $: trustedContacts = $contacts.filter(
     (c) => c.is_own_device || c.trust_level === 'trusted_auto_accept'
   );
 
+  function handlePaste(e: ClipboardEvent) {
+    if (!e.clipboardData) return;
+    const items = e.clipboardData.items;
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.startsWith('image/')) {
+        const file = items[i].getAsFile();
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            if (event.target?.result && typeof event.target.result === 'string') {
+              textContent = event.target.result;
+            }
+          };
+          reader.readAsDataURL(file);
+          e.preventDefault();
+          return;
+        }
+      }
+    }
+  }
+
   onMount(async () => {
+    window.addEventListener('paste', handlePaste);
     await fetchLocalClipboard();
+  });
+
+  onDestroy(() => {
+    window.removeEventListener('paste', handlePaste);
   });
 
   async function fetchLocalClipboard() {
@@ -53,7 +81,7 @@
 
   async function handleSend() {
     if (!textContent.trim()) {
-      statusMessage = 'Clipboard text cannot be empty';
+      statusMessage = 'Clipboard content cannot be empty';
       statusType = 'error';
       return;
     }
@@ -124,12 +152,17 @@
       </button>
     </div>
 
-    <!-- Text Area & Actions -->
+    <!-- Text / Image Area & Actions -->
     <div class="space-y-2">
       <div class="flex items-center justify-between text-xs">
         <div class="flex items-center gap-2">
           <span class="font-semibold text-slate-300">Clipboard Content</span>
-          {#if isUrl}
+          {#if isImage}
+            <span class="px-2 py-0.5 rounded-full bg-purple-500/15 text-purple-300 border border-purple-500/30 text-[10px] font-mono flex items-center gap-1">
+              <ImageIcon class="w-3 h-3" />
+              Image
+            </span>
+          {:else if isUrl}
             <span class="px-2 py-0.5 rounded-full bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 text-[10px] font-mono flex items-center gap-1">
               <Globe class="w-3 h-3" />
               URL Link
@@ -148,17 +181,38 @@
         </button>
       </div>
 
-      <div class="relative">
-        <textarea
-          bind:value={textContent}
-          rows="5"
-          placeholder="Paste or type text, link, snippet to sync..."
-          class="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40 text-xs text-white placeholder-slate-500 font-mono resize-none transition"
-        ></textarea>
-        <div class="absolute bottom-2.5 right-3 text-[10px] font-mono text-slate-500">
-          {textContent.length} chars
+      {#if isImage}
+        <div class="p-3 bg-slate-950 border border-indigo-500/30 rounded-xl flex flex-col items-center gap-2.5">
+          <div class="relative max-h-52 w-full overflow-hidden rounded-lg border border-slate-800 bg-slate-900/60 flex items-center justify-center p-2">
+            <img src={textContent} alt="Clipboard Content" class="max-h-48 object-contain rounded" />
+          </div>
+          <div class="flex items-center justify-between w-full text-xs text-slate-400">
+            <span class="text-indigo-300 font-mono text-[11px] flex items-center gap-1">
+              <Sparkles class="w-3.5 h-3.5" />
+              Image Clipboard Ready to Sync (Ctrl+V supported)
+            </span>
+            <button
+              type="button"
+              on:click={() => (textContent = '')}
+              class="text-rose-400 hover:text-rose-300 text-[11px] font-semibold transition"
+            >
+              Clear
+            </button>
+          </div>
         </div>
-      </div>
+      {:else}
+        <div class="relative">
+          <textarea
+            bind:value={textContent}
+            rows="5"
+            placeholder="Paste or type text, link, snippet to sync (or press Ctrl+V to paste an image)..."
+            class="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40 text-xs text-white placeholder-slate-500 font-mono resize-none transition"
+          ></textarea>
+          <div class="absolute bottom-2.5 right-3 text-[10px] font-mono text-slate-500">
+            {textContent.length} chars
+          </div>
+        </div>
+      {/if}
     </div>
 
     <!-- Target Device Selector -->

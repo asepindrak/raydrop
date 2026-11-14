@@ -196,10 +196,12 @@
 
   async function sendToDeviceId(deviceId: string, label: string, directory = false) {
     try {
+      const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
+      const shouldPickDir = directory && !isMobile;
       const selected = await open({
         multiple: true,
-        directory,
-        title: directory ? `Send Folder to ${label}` : `Send Files to ${label}`,
+        directory: shouldPickDir,
+        title: shouldPickDir ? `Send Folder to ${label}` : `Send Files to ${label}`,
       });
       if (!selected) return;
       const paths = Array.isArray(selected) ? selected : [selected];
@@ -209,7 +211,12 @@
       }
     } catch (err: any) {
       console.error('Failed to send files:', err);
-      alert('Gagal mengirim file: ' + (err?.toString() || 'Unknown error'));
+      const msg = err?.toString() || '';
+      if (msg.includes('FolderPickerNotImplemented')) {
+        alert('Android tidak mendukung pemilihan folder langsung. Silakan gunakan tombol Kirim File.');
+      } else {
+        alert('Gagal mengirim file: ' + (msg || 'Unknown error'));
+      }
     }
   }
 
