@@ -155,6 +155,16 @@ export interface WebShareInfo {
   files: WebShareItem[];
 }
 
+export interface FolderSyncTask {
+  id: string;
+  local_path: string;
+  target_device_id: string;
+  target_alias: string;
+  is_auto_sync: boolean;
+  last_sync_at: number | null;
+  created_at: number;
+}
+
 export interface TransferProgressEvent {
   session_id: string;
   peer_device_id: string;
@@ -304,6 +314,19 @@ export const raydropApi = {
     }),
   setSpeedLimit: (speedLimitMbps: number) =>
     invoke<number>('set_speed_limit', { speedLimitMbps }),
+  listFolderSyncTasks: () =>
+    invoke<FolderSyncTask[]>('list_folder_sync_tasks'),
+  addFolderSyncTask: (params: {
+    localPath: string;
+    targetDeviceId: string;
+    isAutoSync: boolean;
+  }) => invoke<FolderSyncTask>('add_folder_sync_task', params),
+  toggleFolderSyncAuto: (taskId: string, isAuto: boolean) =>
+    invoke<void>('toggle_folder_sync_auto', { taskId, isAuto }),
+  deleteFolderSyncTask: (taskId: string) =>
+    invoke<void>('delete_folder_sync_task', { taskId }),
+  triggerFolderSync: (taskId: string) =>
+    invoke<string>('trigger_folder_sync', { taskId }),
   listenEvent: <T>(event: string, handler: (payload: T) => void): Promise<UnlistenFn> =>
     listen<T>(event, (e) => handler(e.payload)),
 };

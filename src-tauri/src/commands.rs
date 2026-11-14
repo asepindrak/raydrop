@@ -1340,3 +1340,86 @@ pub fn broadcast_clipboard(
     Ok(sent_count)
 }
 
+#[tauri::command]
+pub fn list_folder_sync_tasks(
+    state: State<'_, Arc<AppState>>,
+) -> Result<Vec<crate::db::storage::FolderSyncTask>, String> {
+    state.db.list_folder_sync_tasks()
+}
+
+#[tauri::command]
+pub fn add_folder_sync_task(
+    state: State<'_, Arc<AppState>>,
+    local_path: String,
+    target_device_id: String,
+    is_auto_sync: bool,
+) -> Result<crate::db::storage::FolderSyncTask, String> {
+    let p = std::path::Path::new(&local_path);
+    if !p.exists() || !p.is_dir() {
+        return Err("Selected path does not exist or is not a directory".to_string());
+    }
+
+    let contact = state
+        .db
+        .get_contact(&target_device_id)?
+        .ok_or_else(|| "Target device not found in contacts".to_string())?;
+
+    let task = crate::db::storage::FolderSyncTask {
+        id: uuid::Uuid::new_v4().to_string(),
+        local_path,
+        target_device_id,
+        target_alias: contact.alias_name,
+        is_auto_sync,
+        last_sync_at: None,
+        created_at: now_unix_secs(),
+    };
+
+    state.db.insert_folder_sync_task(&task)?;
+    Ok(task)
+}
+
+#[tauri::command]
+pub fn toggle_folder_sync_auto(
+    state: State<'_, Arc<AppState>>,
+    task_id: String,
+    is_auto: bool,
+) -> Result<(), String> {
+    state.db.update_folder_sync_auto_flag(&task_id, is_auto)
+}
+
+#[tauri::command]
+pub fn delete_folder_sync_task(
+    state: State<'_, Arc<AppState>>,
+    task_id: String,
+) -> Result<(), String> {
+    state.db.delete_folder_sync_task(&task_id)
+}
+
+#[tauri::command]
+pub async fn trigger_folder_sync(
+    app: AppHandle,
+    state: State<'_, Arc<AppState>>,
+    task_id: String,
+) -> Result<String, String> {
+    let task = state
+        .db
+        .get_folder_sync_task(&task_id)?
+        .ok_or_else(|| "Folder sync task not found".to_string())?;
+
+    let p = std::path::Path::new(&task.local_path);
+    if !p.exists() || !p.is_dir() {
+        return Err("Local folder no longer exists on disk".to_string());
+    }
+
+    let session_id = initiate_peer_transfer(
+        app,
+        state.inner().clone(),
+        task.target_device_id,
+        vec![task.local_path],
+    )
+    .await?;
+
+    let _ = state.db.update_folder_sync_last_time(&task_id, now_unix_secs());
+    Ok(session_id)
+}
+

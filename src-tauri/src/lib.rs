@@ -305,6 +305,11 @@ pub fn run() {
             commands::write_system_clipboard,
             commands::broadcast_clipboard,
             commands::set_speed_limit,
+            commands::list_folder_sync_tasks,
+            commands::add_folder_sync_task,
+            commands::toggle_folder_sync_auto,
+            commands::delete_folder_sync_task,
+            commands::trigger_folder_sync,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Raydrop Tauri application");

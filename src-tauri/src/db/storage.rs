@@ -54,6 +54,17 @@ pub struct ChatMessage {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FolderSyncTask {
+    pub id: String,
+    pub local_path: String,
+    pub target_device_id: String,
+    pub target_alias: String,
+    pub is_auto_sync: bool,
+    pub last_sync_at: Option<u64>,
+    pub created_at: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppSettings {
     pub device_id: String,
     pub alias_name: String,
@@ -141,6 +152,16 @@ impl Database {
             );
 
             CREATE INDEX IF NOT EXISTS idx_chat_peer_time ON chat_messages(peer_device_id, created_at);
+
+            CREATE TABLE IF NOT EXISTS folder_sync_tasks (
+                id TEXT PRIMARY KEY,
+                local_path TEXT NOT NULL,
+                target_device_id TEXT NOT NULL,
+                target_alias TEXT NOT NULL,
+                is_auto_sync INTEGER DEFAULT 0,
+                last_sync_at INTEGER,
+                created_at INTEGER NOT NULL
+            );
             ",
         )
         .map_err(|e| e.to_string())?;
@@ -667,5 +688,108 @@ impl Database {
             map.insert(k, v);
         }
         Ok(map)
+    }
+
+    pub fn insert_folder_sync_task(&self, task: &FolderSyncTask) -> Result<(), String> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "INSERT OR REPLACE INTO folder_sync_tasks 
+             (id, local_path, target_device_id, target_alias, is_auto_sync, last_sync_at, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            params![
+                task.id,
+                task.local_path,
+                task.target_device_id,
+                task.target_alias,
+                if task.is_auto_sync { 1 } else { 0 },
+                task.last_sync_at,
+                task.created_at
+            ],
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    pub fn list_folder_sync_tasks(&self) -> Result<Vec<FolderSyncTask>, String> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn
+            .prepare(
+                "SELECT id, local_path, target_device_id, target_alias, is_auto_sync, last_sync_at, created_at
+                 FROM folder_sync_tasks
+                 ORDER BY created_at DESC",
+            )
+            .map_err(|e| e.to_string())?;
+
+        let rows = stmt
+            .query_map([], |row| {
+                let auto: i64 = row.get(4)?;
+                Ok(FolderSyncTask {
+                    id: row.get(0)?,
+                    local_path: row.get(1)?,
+                    target_device_id: row.get(2)?,
+                    target_alias: row.get(3)?,
+                    is_auto_sync: auto != 0,
+                    last_sync_at: row.get(5)?,
+                    created_at: row.get(6)?,
+                })
+            })
+            .map_err(|e| e.to_string())?;
+
+        let mut list = Vec::new();
+        for r in rows {
+            list.push(r.map_err(|e| e.to_string())?);
+        }
+        Ok(list)
+    }
+
+    pub fn get_folder_sync_task(&self, id: &str) -> Result<Option<FolderSyncTask>, String> {
+        let conn = self.conn.lock().unwrap();
+        conn.query_row(
+            "SELECT id, local_path, target_device_id, target_alias, is_auto_sync, last_sync_at, created_at
+             FROM folder_sync_tasks
+             WHERE id = ?1",
+            params![id],
+            |row| {
+                let auto: i64 = row.get(4)?;
+                Ok(FolderSyncTask {
+                    id: row.get(0)?,
+                    local_path: row.get(1)?,
+                    target_device_id: row.get(2)?,
+                    target_alias: row.get(3)?,
+                    is_auto_sync: auto != 0,
+                    last_sync_at: row.get(5)?,
+                    created_at: row.get(6)?,
+                })
+            },
+        )
+        .optional()
+        .map_err(|e| e.to_string())
+    }
+
+    pub fn update_folder_sync_last_time(&self, id: &str, last_time: u64) -> Result<(), String> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "UPDATE folder_sync_tasks SET last_sync_at = ?1 WHERE id = ?2",
+            params![last_time, id],
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    pub fn update_folder_sync_auto_flag(&self, id: &str, is_auto: bool) -> Result<(), String> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "UPDATE folder_sync_tasks SET is_auto_sync = ?1 WHERE id = ?2",
+            params![if is_auto { 1 } else { 0 }, id],
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    pub fn delete_folder_sync_task(&self, id: &str) -> Result<(), String> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute("DELETE FROM folder_sync_tasks WHERE id = ?1", params![id])
+            .map_err(|e| e.to_string())?;
+        Ok(())
     }
 }

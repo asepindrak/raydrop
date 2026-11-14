@@ -6,6 +6,7 @@
   import { raydropApi, formatBytes, type TransferRecord, type WebShareInfo } from '../utils/tauri-ipc';
   import WebShareModal from './WebShareModal.svelte';
   import ClipboardShareModal from './ClipboardShareModal.svelte';
+  import FolderSyncModal from './FolderSyncModal.svelte';
   import {
     ArrowUpRight,
     ArrowDownLeft,
@@ -35,6 +36,7 @@
     QrCode,
     Clipboard,
     Gauge,
+    FolderSync,
   } from 'lucide-svelte';
 
   let resumingId = '';
@@ -44,6 +46,7 @@
   let isDraggingOver = false;
   let webShareInfo: WebShareInfo | null = null;
   let showClipboardModal = false;
+  let showFolderSyncModal = false;
   let showSpeedLimitMenu = false;
 
   function toggleExpanded(id: string) {
@@ -298,6 +301,16 @@
       >
         <Clipboard class="w-4 h-4 text-indigo-200" />
         <span>Sync Clipboard</span>
+      </button>
+
+      <button
+        type="button"
+        on:click={() => (showFolderSyncModal = true)}
+        class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600/80 to-teal-600/80 hover:from-emerald-500 hover:to-teal-500 text-white font-semibold text-sm border border-emerald-500/30 transition-all hover:-translate-y-0.5 shadow-lg shadow-emerald-500/20"
+        title="Mirror / sync whole folders directly to your trusted peers"
+      >
+        <FolderSync class="w-4 h-4 text-emerald-200" />
+        <span>Folder Sync</span>
       </button>
     </div>
 
@@ -720,6 +733,15 @@
               <Clipboard class="w-4 h-4 text-indigo-300" />
               <span>Sync Clipboard</span>
             </button>
+
+            <button
+              type="button"
+              on:click={() => (showFolderSyncModal = true)}
+              class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-200 text-xs font-semibold border border-emerald-500/40 transition"
+            >
+              <FolderSync class="w-4 h-4 text-emerald-300" />
+              <span>Folder Sync</span>
+            </button>
           </div>
         </div>
       {:else if filteredHistory.length === 0}
@@ -867,6 +889,14 @@
     <ClipboardShareModal
       onClose={() => {
         showClipboardModal = false;
+      }}
+    />
+  {/if}
+
+  {#if showFolderSyncModal}
+    <FolderSyncModal
+      onClose={() => {
+        showFolderSyncModal = false;
       }}
     />
   {/if}
