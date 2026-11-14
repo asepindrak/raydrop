@@ -59,7 +59,40 @@ jobs:
         with:
           tagName: v__VERSION__
           releaseName: 'Raydrop v__VERSION__'
-          releaseBody: '### Raydrop Universal P2P File Transfer (v__VERSION__)\n\nDownload the installer for your operating system below:\n- **Windows (x64):** `Raydrop___VERSION___x64_en-US.msi`\n- **macOS (Universal):** `Raydrop___VERSION___universal.dmg`\n- **Linux (x64):** `.deb` or `.AppImage`\n\nFeatures:\n- Zero-Server P2P High-Speed File Transfer (LAN + Tailscale + WAN Relay)\n- End-to-End Encrypted Real-Time Chat\n- 6-Stream Parallel Chunk Acceleration\n- Keepalive Heartbeats & Auto-Resume'
+          releaseBody: |
+            <p align="center">
+              <img src="https://raw.githubusercontent.com/asepindrak/raydrop/main/assets/logo.png" alt="Raydrop Logo" width="220" />
+            </p>
+
+            <h2 align="center">Raydrop v__VERSION__ Release</h2>
+
+            <p align="center">
+              <strong>Universal P2P File Transfer (LAN + Direct WAN)</strong><br />
+              Fast, Resumable, End-to-End Encrypted File Sharing Across Devices with Zero Server Storage.
+            </p>
+
+            ---
+
+            ### 📦 Available Downloads
+
+            | Operating System | Package | Architecture | Description |
+            | :--- | :---: | :---: | :--- |
+            | **Windows** | `.msi` | x64 (64-bit) | `Raydrop___VERSION___x64_en-US.msi` — Official Windows installer with Explorer context menu |
+            | **macOS** | `.dmg` | Universal | `Raydrop___VERSION___universal.dmg` — Native Universal DMG for Apple Silicon (M1–M4) & Intel |
+            | **Linux (Debian / Ubuntu)** | `.deb` | x64 (amd64) | `Raydrop___VERSION___amd64.deb` — Debian/Ubuntu package with desktop menu integration |
+            | **Linux (Universal)** | `.AppImage` | x64 (amd64) | `Raydrop___VERSION___amd64.AppImage` — Portable standalone binary for all Linux distros |
+            | **Android** | `.apk` | ARM64 (`arm64-v8a`) | `Raydrop-arm64-v8a.apk` — Native Android APK for phones and tablets |
+
+            ---
+
+            ### 🚀 Features & Highlights
+            - **Seamless Universal Clipboard Sync:** Automatically writes directly to the recipient's system clipboard without manual copying. Full support for **Clipboard Images** and Screenshots.
+            - **Android P2P Transfer & Magic-Bytes Engine:** Accurate file extension and naming detection directly from Android media pickers.
+            - **Zero-Server P2P High-Speed File Transfer:** Direct LAN mDNS & WAN NAT hole-punching with zero cloud file storage.
+            - **Parallel Multi-Segment Acceleration:** Up to 6 simultaneous streaming workers for rapid chunk delivery.
+            - **End-to-End Cryptographic Security:** ChaCha20-Poly1305 AEAD chunk encryption, BLAKE3 integrity verification, and ephemeral X25519 forward secrecy.
+            - **Resumable Transfers (`.raypart`):** Seamless O(1) auto-resume from interrupted connections.
+            - **Integrated E2EE Chat & File Sharing:** In-chat file attachments and synchronized transfers.
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
