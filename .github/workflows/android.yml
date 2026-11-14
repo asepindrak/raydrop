@@ -58,6 +58,10 @@ jobs:
           NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
           ANDROID_HOME: ${{ env.ANDROID_HOME || '/usr/local/lib/android/sdk' }}
 
+      - name: Apply Raydrop App Icons to Android Project
+        run: |
+          cp -rf src-tauri/icons/android/* src-tauri/gen/android/app/src/main/res/
+
       - name: Build Android APK (ARM64)
         run: npx @tauri-apps/cli android build --apk --target aarch64 --ci
         env:
