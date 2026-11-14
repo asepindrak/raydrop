@@ -195,15 +195,21 @@
   }
 
   async function sendToDeviceId(deviceId: string, label: string, directory = false) {
-    const selected = await open({
-      multiple: true,
-      directory,
-      title: directory ? `Send Folder to ${label}` : `Send Files to ${label}`,
-    });
-    if (!selected) return;
-    const paths = Array.isArray(selected) ? selected : [selected];
-    if (paths.length > 0) {
-      await raydropApi.initiateTransfer(deviceId, paths);
+    try {
+      const selected = await open({
+        multiple: true,
+        directory,
+        title: directory ? `Send Folder to ${label}` : `Send Files to ${label}`,
+      });
+      if (!selected) return;
+      const paths = Array.isArray(selected) ? selected : [selected];
+      if (paths.length > 0) {
+        await raydropApi.initiateTransfer(deviceId, paths);
+        activeMainTab.set('transfers');
+      }
+    } catch (err: any) {
+      console.error('Failed to send files:', err);
+      alert('Gagal mengirim file: ' + (err?.toString() || 'Unknown error'));
     }
   }
 
@@ -302,7 +308,7 @@
       {:else}
         {#each $cloudMyDevices as dev (dev.device_id)}
           {@const isThisDevice = dev.device_id === $appSettings.device_id}
-          <div class="p-3.5 rounded-xl bg-slate-900/90 border {isThisDevice ? 'border-cyan-500/40' : 'border-slate-800'} flex items-center justify-between gap-3">
+          <div class="p-3.5 rounded-xl bg-slate-900/90 border {isThisDevice ? 'border-cyan-500/40' : 'border-slate-800'} flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div class="flex items-center gap-3 min-w-0">
               <div class="relative w-10 h-10 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center shrink-0">
                 <Laptop class="w-5 h-5 text-cyan-400" />
@@ -334,7 +340,7 @@
                     </button>
                   </div>
                 {:else}
-                  <div class="flex items-center gap-2">
+                  <div class="flex items-center gap-2 flex-wrap">
                     <p class="text-sm font-semibold text-slate-100 truncate">{dev.device_name}</p>
                     {#if isThisDevice}
                       <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">
@@ -359,7 +365,7 @@
               </div>
             </div>
 
-            <div class="flex items-center gap-1.5 shrink-0">
+            <div class="flex items-center gap-1.5 flex-wrap w-full sm:w-auto justify-end pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-800/60">
               <button
                 on:click={() => {
                   editingDeviceId = dev.device_id;
@@ -422,7 +428,7 @@
         {#each $cloudContacts as group (group.email)}
           {@const primaryDev = pickPrimaryDevice(group)}
           <div class="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 space-y-2.5">
-            <div class="flex items-center justify-between gap-3">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div class="flex items-center gap-3 min-w-0">
                 <div class="relative w-10 h-10 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center shrink-0">
                   <Mail class="w-5 h-5 text-cyan-400" />
@@ -433,7 +439,7 @@
                   ></span>
                 </div>
                 <div class="min-w-0">
-                  <div class="flex items-center gap-2">
+                  <div class="flex items-center gap-2 flex-wrap">
                     <p class="text-sm font-bold text-white truncate">{group.name}</p>
                     <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-800 text-cyan-300 border border-slate-700">
                       {group.devices.length} device(s)
@@ -443,45 +449,47 @@
                 </div>
               </div>
 
-              <div class="flex items-center gap-2 shrink-0">
+              <div class="flex items-center gap-1.5 flex-wrap w-full sm:w-auto justify-between sm:justify-end pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-800/60">
                 <select
                   value={group.trust_level}
                   on:change={(e) => handleContactTrustChange(group.email, e.currentTarget.value)}
-                  class="bg-slate-950 border border-slate-700/80 rounded-lg px-2 py-1 text-[11px] text-slate-300 focus:outline-none focus:border-cyan-500"
+                  class="flex-1 sm:flex-initial bg-slate-950 border border-slate-700/80 rounded-lg px-2 py-1.5 text-[11px] text-slate-300 focus:outline-none focus:border-cyan-500"
                 >
-                  <option value="ask">Ask Every Time</option>
+                  <option value="ask">Ask</option>
                   <option value="trusted_auto_accept">Auto-Accept</option>
                   <option value="blocked">Blocked</option>
                 </select>
 
                 {#if primaryDev}
-                  <button
-                    on:click={() => openChatWith(primaryDev.device_id)}
-                    class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-500/15 hover:bg-indigo-500 text-indigo-300 hover:text-slate-950 border border-indigo-500/30 text-xs font-semibold transition-all"
-                    title="P2P Chat"
-                  >
-                    <MessageSquare class="w-3.5 h-3.5" />
-                    <span>Chat</span>
-                  </button>
-                  <button
-                    on:click={() => sendToDeviceId(primaryDev.device_id, `${group.name} (${primaryDev.device_name})`, false)}
-                    class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-500/15 hover:bg-cyan-500 text-cyan-300 hover:text-slate-950 border border-cyan-500/30 text-xs font-semibold transition-all"
-                  >
-                    <Send class="w-3.5 h-3.5" />
-                    <span>Send</span>
-                  </button>
-                  <button
-                    on:click={() => sendToDeviceId(primaryDev.device_id, `${group.name} (${primaryDev.device_name})`, true)}
-                    class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700"
-                    title="Send Folder"
-                  >
-                    <FolderUp class="w-4 h-4" />
-                  </button>
+                  <div class="flex items-center gap-1.5 shrink-0">
+                    <button
+                      on:click={() => openChatWith(primaryDev.device_id)}
+                      class="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg bg-indigo-500/15 hover:bg-indigo-500 text-indigo-300 hover:text-slate-950 border border-indigo-500/30 text-xs font-semibold transition-all"
+                      title="P2P Chat"
+                    >
+                      <MessageSquare class="w-3.5 h-3.5" />
+                      <span>Chat</span>
+                    </button>
+                    <button
+                      on:click={() => sendToDeviceId(primaryDev.device_id, `${group.name} (${primaryDev.device_name})`, false)}
+                      class="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg bg-cyan-500/15 hover:bg-cyan-500 text-cyan-300 hover:text-slate-950 border border-cyan-500/30 text-xs font-semibold transition-all"
+                    >
+                      <Send class="w-3.5 h-3.5" />
+                      <span>Send</span>
+                    </button>
+                    <button
+                      on:click={() => sendToDeviceId(primaryDev.device_id, `${group.name} (${primaryDev.device_name})`, true)}
+                      class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700"
+                      title="Send Folder"
+                    >
+                      <FolderUp class="w-4 h-4" />
+                    </button>
+                  </div>
                 {/if}
 
                 <button
                   on:click={() => handleRemoveContact(group.email)}
-                  class="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20"
+                  class="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 shrink-0"
                   title="Remove Contact"
                 >
                   <Trash2 class="w-3.5 h-3.5" />
@@ -520,20 +528,20 @@
     {:else}
       <!-- LAN Radar Tab -->
       {#each $lanContacts as peer (peer.device_id)}
-        <div class="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center justify-between gap-3">
+        <div class="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div class="flex items-center gap-3 min-w-0">
             <div class="relative w-10 h-10 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center shrink-0">
               <Laptop class="w-5 h-5 text-cyan-400" />
               <span class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full ring-2 ring-slate-900 bg-emerald-400"></span>
             </div>
             <div class="min-w-0">
-              <div class="flex items-center gap-2">
+              <div class="flex items-center gap-2 flex-wrap">
                 <p class="text-sm font-semibold text-slate-100 truncate">{peer.alias_name}</p>
                 {#if peer.user_email}
-                  <span class="text-[11px] font-mono text-cyan-300">{peer.user_email}</span>
+                  <span class="text-[11px] font-mono text-cyan-300 truncate">{peer.user_email}</span>
                 {/if}
               </div>
-              <p class="text-xs font-mono text-slate-400 truncate">
+              <p class="text-xs font-mono text-slate-400 truncate mt-0.5">
                 {peer.device_id}
                 {#if peer.last_known_ip}
                   <span class="text-slate-500">• {peer.last_known_ip}</span>
@@ -542,39 +550,41 @@
             </div>
           </div>
 
-          <div class="flex items-center gap-2 shrink-0">
+          <div class="flex items-center gap-1.5 flex-wrap w-full sm:w-auto justify-between sm:justify-end pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-800/60">
             <select
               value={peer.trust_level}
               on:change={(e) => handleLanTrustChange(peer, e.currentTarget.value)}
-              class="bg-slate-950 border border-slate-700/80 rounded-lg px-2 py-1 text-[11px] text-slate-300 focus:outline-none focus:border-cyan-500"
+              class="flex-1 sm:flex-initial bg-slate-950 border border-slate-700/80 rounded-lg px-2 py-1.5 text-[11px] text-slate-300 focus:outline-none focus:border-cyan-500"
             >
-              <option value="ask">Ask Every Time</option>
+              <option value="ask">Ask</option>
               <option value="trusted_auto_accept">Auto-Accept</option>
               <option value="blocked">Blocked</option>
             </select>
 
-            <button
-              on:click={() => openChatWith(peer.device_id)}
-              class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-500/15 hover:bg-indigo-500 text-indigo-300 hover:text-slate-950 border border-indigo-500/30 text-xs font-semibold transition-all"
-              title="P2P Chat"
-            >
-              <MessageSquare class="w-3.5 h-3.5" />
-              <span>Chat</span>
-            </button>
-            <button
-              on:click={() => sendToDeviceId(peer.device_id, peer.alias_name, false)}
-              class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-500/15 hover:bg-cyan-500 text-cyan-300 hover:text-slate-950 border border-cyan-500/30 text-xs font-semibold transition-all"
-            >
-              <Send class="w-3.5 h-3.5" />
-              <span>Files</span>
-            </button>
-            <button
-              on:click={() => sendToDeviceId(peer.device_id, peer.alias_name, true)}
-              class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700"
-              title="Send Folder"
-            >
-              <FolderUp class="w-4 h-4" />
-            </button>
+            <div class="flex items-center gap-1.5 shrink-0">
+              <button
+                on:click={() => openChatWith(peer.device_id)}
+                class="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg bg-indigo-500/15 hover:bg-indigo-500 text-indigo-300 hover:text-slate-950 border border-indigo-500/30 text-xs font-semibold transition-all"
+                title="P2P Chat"
+              >
+                <MessageSquare class="w-3.5 h-3.5" />
+                <span>Chat</span>
+              </button>
+              <button
+                on:click={() => sendToDeviceId(peer.device_id, peer.alias_name, false)}
+                class="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg bg-cyan-500/15 hover:bg-cyan-500 text-cyan-300 hover:text-slate-950 border border-cyan-500/30 text-xs font-semibold transition-all"
+              >
+                <Send class="w-3.5 h-3.5" />
+                <span>Files</span>
+              </button>
+              <button
+                on:click={() => sendToDeviceId(peer.device_id, peer.alias_name, true)}
+                class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700"
+                title="Send Folder"
+              >
+                <FolderUp class="w-4 h-4" />
+              </button>
+            </div>
           </div>
         </div>
       {:else}

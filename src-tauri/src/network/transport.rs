@@ -1337,8 +1337,48 @@ where
     Ok(())
 }
 
+fn extract_clean_filename(raw: &str, next_id: u32) -> String {
+    let unescaped = raw.replace("%20", " ");
+    let last_seg = unescaped.rsplit('/').next().unwrap_or("");
+    let name_part = last_seg.rsplit(':').next().unwrap_or(last_seg);
+    let trimmed = name_part.trim();
+    if !trimmed.is_empty() && trimmed.contains('.') {
+        trimmed.to_string()
+    } else {
+        format!("file_{next_id}.bin")
+    }
+}
+
+fn resolve_android_content_uri(
+    app: &AppHandle,
+    uri_str: &str,
+    next_id: u32,
+) -> Result<PathBuf, String> {
+    use std::str::FromStr;
+    use tauri_plugin_fs::{FilePath, FsExt};
+
+    let file_path = FilePath::from_str(uri_str)
+        .map_err(|e| format!("Failed to parse content URI: {e}"))?;
+
+    let bytes = app
+        .fs()
+        .read(file_path)
+        .map_err(|e| format!("Failed to read Android content URI '{uri_str}': {e}"))?;
+
+    let cache_dir = crate::db::storage::resolve_app_data_dir()?.join("transfer_cache");
+    let _ = std::fs::create_dir_all(&cache_dir);
+
+    let clean_name = extract_clean_filename(uri_str, next_id);
+    let target = cache_dir.join(&clean_name);
+    std::fs::write(&target, &bytes)
+        .map_err(|e| format!("Failed to cache Android content file to '{target:?}': {e}"))?;
+
+    Ok(target)
+}
+
 /// Collects files (and recursively walks folders) into a manifest list alongside their local source paths.
 fn collect_outgoing_files(
+    app: &AppHandle,
     raw_paths: &[String],
 ) -> Result<(Vec<(u32, PathBuf, ManifestFileEntry)>, u64), String> {
     let mut items = Vec::new();
@@ -1346,7 +1386,12 @@ fn collect_outgoing_files(
     let mut next_id = 1u32;
 
     for raw in raw_paths {
-        let p = PathBuf::from(raw);
+        let p = if raw.starts_with("content://") || raw.starts_with("file://") {
+            resolve_android_content_uri(app, raw, next_id)?
+        } else {
+            PathBuf::from(raw)
+        };
+
         if !p.exists() {
             continue;
         }
@@ -1483,7 +1528,7 @@ async fn start_or_resume_transfer(
         }
     };
 
-    let (files_with_paths, total_bytes) = collect_outgoing_files(&file_paths)?;
+    let (files_with_paths, total_bytes) = collect_outgoing_files(&app, &file_paths)?;
     let session_uuid = match &existing_session_id {
         Some(sid) => Uuid::parse_str(sid).unwrap_or_else(|_| Uuid::new_v4()),
         None => Uuid::new_v4(),

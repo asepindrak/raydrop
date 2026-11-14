@@ -688,20 +688,20 @@
 
       {#if filteredHistory.length === 0 && filteredActive.length === 0}
         <!-- Beautiful Empty State (Matching Landing Page Demo Aesthetic) -->
-        <div class="h-80 flex flex-col items-center justify-center text-center p-8 border border-dashed border-slate-800 rounded-2xl bg-slate-950/30">
-          <div class="w-16 h-16 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center mb-4 text-cyan-400 shadow-xl shadow-cyan-500/10">
-            <Upload class="w-8 h-8 stroke-[1.8]" />
+        <div class="min-h-[22rem] flex flex-col items-center justify-center text-center p-4 sm:p-8 border border-dashed border-slate-800 rounded-2xl bg-slate-950/30">
+          <div class="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center mb-3 sm:mb-4 text-cyan-400 shadow-xl shadow-cyan-500/10">
+            <Upload class="w-7 h-7 sm:w-8 sm:h-8 stroke-[1.8]" />
           </div>
-          <h4 class="text-base font-bold text-white font-display">Ready for High-Speed P2P Transfers</h4>
-          <p class="text-xs text-slate-400 mt-1.5 max-w-md leading-relaxed">
+          <h4 class="text-sm sm:text-base font-bold text-white font-display">Ready for High-Speed P2P Transfers</h4>
+          <p class="text-xs text-slate-400 mt-1 sm:mt-1.5 max-w-md leading-relaxed">
             Send files and folders of any size directly between computers on your local network (LAN) or internet (WAN). Zero cloud servers involved.
           </p>
 
-          <div class="flex items-center gap-3 mt-5">
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:flex lg:flex-wrap items-center justify-center gap-2 sm:gap-3 mt-4 sm:mt-5 w-full max-w-xl">
             <button
               type="button"
               on:click={handlePickFiles}
-              class="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-white font-bold text-xs shadow-lg shadow-cyan-500/20 transition-all"
+              class="col-span-1 sm:col-span-2 lg:col-span-1 flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-white font-bold text-xs shadow-lg shadow-cyan-500/20 transition-all"
             >
               <Plus class="w-4 h-4" />
               <span>Select Files to Send</span>
@@ -710,7 +710,7 @@
             <button
               type="button"
               on:click={() => activeMainTab.set('lan')}
-              class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition"
+              class="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition"
             >
               <Radio class="w-4 h-4 text-cyan-400" />
               <span>Scan LAN Radar</span>
@@ -719,7 +719,7 @@
             <button
               type="button"
               on:click={handleShareViaWeb}
-              class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 text-purple-200 text-xs font-semibold border border-purple-500/40 transition"
+              class="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 text-purple-200 text-xs font-semibold border border-purple-500/40 transition"
             >
               <QrCode class="w-4 h-4 text-purple-300" />
               <span>Share to Phone</span>
@@ -728,7 +728,7 @@
             <button
               type="button"
               on:click={() => (showClipboardModal = true)}
-              class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-200 text-xs font-semibold border border-indigo-500/40 transition"
+              class="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-200 text-xs font-semibold border border-indigo-500/40 transition"
             >
               <Clipboard class="w-4 h-4 text-indigo-300" />
               <span>Sync Clipboard</span>
@@ -737,7 +737,7 @@
             <button
               type="button"
               on:click={() => (showFolderSyncModal = true)}
-              class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-200 text-xs font-semibold border border-emerald-500/40 transition"
+              class="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-200 text-xs font-semibold border border-emerald-500/40 transition"
             >
               <FolderSync class="w-4 h-4 text-emerald-300" />
               <span>Folder Sync</span>

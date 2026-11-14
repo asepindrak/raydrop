@@ -1,7 +1,7 @@
 <script lang="ts">
   import { tick } from 'svelte';
   import { open } from '@tauri-apps/plugin-dialog';
-  import { appSettings, incomingRequestQueue, cliQueuedFiles } from '../stores/state';
+  import { appSettings, incomingRequestQueue, cliQueuedFiles, activeMainTab } from '../stores/state';
   import { contacts } from '../stores/contacts';
   import { raydropApi, formatBytes, type Contact } from '../utils/tauri-ipc';
   import {
@@ -98,7 +98,13 @@
     if (!target || $cliQueuedFiles.length === 0) return;
     const files = [...$cliQueuedFiles];
     cliQueuedFiles.set([]);
-    await raydropApi.initiateTransfer(target, files);
+    try {
+      await raydropApi.initiateTransfer(target, files);
+      activeMainTab.set('transfers');
+    } catch (err: any) {
+      console.error('Failed to initiate transfer:', err);
+      alert('Gagal mengirim file: ' + (err?.toString() || 'Unknown error'));
+    }
   }
 </script>
 

@@ -91,7 +91,7 @@ pub fn now_unix_secs() -> u64 {
         .as_secs()
 }
 
-fn resolve_app_data_dir() -> Result<PathBuf, String> {
+pub fn resolve_app_data_dir() -> Result<PathBuf, String> {
     #[cfg(target_os = "android")]
     {
         // On Android, use the internal sandbox data directory for com.raydrop.p2p
