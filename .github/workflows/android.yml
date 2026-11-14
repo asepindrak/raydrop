@@ -78,8 +78,8 @@ jobs:
 
       - name: Attach APK to GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
-        with:
-          files: build-output/*.apk
+        run: |
+          gh release upload "${{ github.ref_name }}" build-output/*.apk --clobber || gh release create "${{ github.ref_name }}" build-output/*.apk --title "Raydrop ${{ github.ref_name }}"
         env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
