@@ -1,4 +1,4 @@
-﻿# Update GitHub Release notes with rich formatting, logo, and release details
+# Update GitHub Release notes with rich formatting, logo, and release details
 $ErrorActionPreference = "Stop"
 
 $credInput = @"

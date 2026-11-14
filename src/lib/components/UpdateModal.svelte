@@ -23,6 +23,8 @@
     HardDrive,
   } from 'lucide-svelte';
 
+  $: isAndroid = /Android/i.test(navigator.userAgent) || ($updateInfo?.asset_name?.toLowerCase().endsWith('.apk') ?? false);
+
   async function handleUpdateNow() {
     if (!$updateInfo || !$updateInfo.download_url || !$updateInfo.asset_name) {
       if ($updateInfo?.html_url) {
@@ -33,7 +35,7 @@
 
     updateErrorMessage.set('');
     updateDownloading.set(true);
-    updateStatusMessage.set('Connecting to GitHub Release server...');
+    updateStatusMessage.set(isAndroid ? 'Mengunduh file APK pembaruan...' : 'Connecting to GitHub Release server...');
 
     try {
       const result = await raydropApi.downloadAndInstallUpdate(
@@ -246,7 +248,7 @@
               class="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-xs font-bold text-white shadow-lg shadow-cyan-500/20 active:scale-95 transition-all"
             >
               <Download class="w-3.5 h-3.5" />
-              <span>Update Now</span>
+              <span>{isAndroid ? 'Download APK' : 'Update Now'}</span>
             </button>
           {:else}
             <button
@@ -254,7 +256,7 @@
               class="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-800 border border-slate-700 text-xs font-semibold text-slate-400 cursor-not-allowed"
             >
               <Loader2 class="w-3.5 h-3.5 animate-spin text-cyan-400" />
-              <span>Installing...</span>
+              <span>{isAndroid ? 'Downloading APK...' : 'Installing...'}</span>
             </button>
           {/if}
         </div>

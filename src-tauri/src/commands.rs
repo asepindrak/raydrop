@@ -888,23 +888,46 @@ pub async fn check_app_update(app: AppHandle) -> Result<UpdateCheckResult, Strin
     let mut asset_size = None;
 
     if let Some(assets) = release_val["assets"].as_array() {
-        // Priority 1: .msi installer
-        let msi_asset = assets.iter().find(|a| {
-            a["name"]
-                .as_str()
-                .map(|n| n.to_lowercase().ends_with(".msi"))
-                .unwrap_or(false)
+        #[cfg(target_os = "android")]
+        let target_asset = assets.iter().find(|a| {
+            let name = a["name"].as_str().unwrap_or("").to_lowercase();
+            name.ends_with(".apk")
         });
 
-        // Priority 2: .exe
-        let exe_asset = assets.iter().find(|a| {
-            a["name"]
-                .as_str()
-                .map(|n| n.to_lowercase().ends_with(".exe"))
-                .unwrap_or(false)
+        #[cfg(target_os = "windows")]
+        let target_asset = assets.iter().find(|a| {
+            let name = a["name"].as_str().unwrap_or("").to_lowercase();
+            name.ends_with(".msi")
+        }).or_else(|| {
+            assets.iter().find(|a| {
+                let name = a["name"].as_str().unwrap_or("").to_lowercase();
+                name.ends_with(".exe")
+            })
         });
 
-        let target_asset = msi_asset.or(exe_asset);
+        #[cfg(target_os = "macos")]
+        let target_asset = assets.iter().find(|a| {
+            let name = a["name"].as_str().unwrap_or("").to_lowercase();
+            name.ends_with(".dmg")
+        });
+
+        #[cfg(target_os = "linux")]
+        let target_asset = assets.iter().find(|a| {
+            let name = a["name"].as_str().unwrap_or("").to_lowercase();
+            name.ends_with(".appimage")
+        }).or_else(|| {
+            assets.iter().find(|a| {
+                let name = a["name"].as_str().unwrap_or("").to_lowercase();
+                name.ends_with(".deb")
+            })
+        });
+
+        #[cfg(not(any(target_os = "android", target_os = "windows", target_os = "macos", target_os = "linux")))]
+        let target_asset = assets.iter().find(|a| {
+            let name = a["name"].as_str().unwrap_or("").to_lowercase();
+            name.ends_with(".msi") || name.ends_with(".apk") || name.ends_with(".dmg") || name.ends_with(".appimage")
+        });
+
         if let Some(a) = target_asset {
             download_url = a["browser_download_url"].as_str().map(String::from);
             asset_name = a["name"].as_str().map(String::from);
@@ -951,6 +974,18 @@ pub async fn download_and_install_update(
     }
 
     let total_bytes = res.content_length().unwrap_or(0);
+
+    #[cfg(target_os = "android")]
+    let temp_file_path = {
+        let dl_dir = std::path::PathBuf::from("/storage/emulated/0/Download");
+        if dl_dir.exists() {
+            dl_dir.join(&asset_name)
+        } else {
+            crate::db::storage::resolve_app_data_dir()?.join(&asset_name)
+        }
+    };
+
+    #[cfg(not(target_os = "android"))]
     let temp_file_path = std::env::temp_dir().join(&asset_name);
 
     let mut file = tokio::fs::File::create(&temp_file_path)
@@ -1030,7 +1065,41 @@ pub async fn download_and_install_update(
         }
     }
 
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(target_os = "android")]
+    {
+        use tauri::Emitter;
+        let path_str = temp_file_path.to_string_lossy().to_string();
+        let _ = app.emit("open_file_requested", &path_str);
+        return Ok(format!("File APK pembaruan tersimpan di Download: {asset_name}. Silakan buka pengelola file untuk menginstal."));
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        let path_str = temp_file_path.to_string_lossy().to_string();
+        std::process::Command::new("open")
+            .arg(&path_str)
+            .spawn()
+            .map_err(|e| format!("Failed to open DMG installer: {e}"))?;
+        return Ok(format!("DMG installer opened from {}", path_str));
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        let path_str = temp_file_path.to_string_lossy().to_string();
+        if path_str.to_lowercase().ends_with(".appimage") {
+            let _ = std::process::Command::new("chmod")
+                .arg("+x")
+                .arg(&path_str)
+                .status();
+        }
+        std::process::Command::new("xdg-open")
+            .arg(&path_str)
+            .spawn()
+            .map_err(|e| format!("Failed to open package: {e}"))?;
+        return Ok(format!("Package saved to {}", path_str));
+    }
+
+    #[cfg(not(any(target_os = "windows", target_os = "android", target_os = "macos", target_os = "linux")))]
     {
         return Ok(format!("Downloaded update to {}", temp_file_path.to_string_lossy()));
     }
