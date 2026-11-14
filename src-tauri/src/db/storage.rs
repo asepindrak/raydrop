@@ -91,13 +91,67 @@ pub fn now_unix_secs() -> u64 {
         .as_secs()
 }
 
+fn resolve_app_data_dir() -> Result<PathBuf, String> {
+    #[cfg(target_os = "android")]
+    {
+        // On Android, use the internal sandbox data directory for com.raydrop.p2p
+        for candidate in &[
+            "/data/user/0/com.raydrop.p2p/files",
+            "/data/data/com.raydrop.p2p/files",
+        ] {
+            let p = PathBuf::from(candidate);
+            if std::fs::create_dir_all(&p).is_ok() {
+                return Ok(p);
+            }
+        }
+        let fallback = PathBuf::from("/data/data/com.raydrop.p2p");
+        let _ = std::fs::create_dir_all(&fallback);
+        Ok(fallback)
+    }
+
+    #[cfg(not(target_os = "android"))]
+    {
+        if let Some(proj_dirs) = ProjectDirs::from("com", "raydrop", "Raydrop") {
+            let data_dir = proj_dirs.data_dir().to_path_buf();
+            std::fs::create_dir_all(&data_dir).map_err(|e| e.to_string())?;
+            return Ok(data_dir);
+        }
+        let fallback = PathBuf::from(".");
+        Ok(fallback)
+    }
+}
+
+fn resolve_default_download_dir() -> String {
+    #[cfg(target_os = "android")]
+    {
+        for candidate in &[
+            "/storage/emulated/0/Download",
+            "/sdcard/Download",
+        ] {
+            let p = PathBuf::from(candidate);
+            if p.exists() || std::fs::create_dir_all(&p).is_ok() {
+                return candidate.to_string();
+            }
+        }
+        if let Ok(data_dir) = resolve_app_data_dir() {
+            return data_dir.to_string_lossy().to_string();
+        }
+        "/storage/emulated/0/Download".to_string()
+    }
+
+    #[cfg(not(target_os = "android"))]
+    {
+        UserDirs::new()
+            .and_then(|u| u.download_dir().map(|p| p.to_path_buf()))
+            .unwrap_or_else(|| PathBuf::from("."))
+            .to_string_lossy()
+            .to_string()
+    }
+}
+
 impl Database {
     pub fn init() -> Result<(Self, DeviceIdentity, AppSettings), String> {
-        let proj_dirs = ProjectDirs::from("com", "raydrop", "Raydrop")
-            .ok_or_else(|| "Failed to resolve application data directory".to_string())?;
-        let data_dir = proj_dirs.data_dir();
-        std::fs::create_dir_all(data_dir).map_err(|e| e.to_string())?;
-
+        let data_dir = resolve_app_data_dir()?;
         let db_path = data_dir.join("storage.db");
         let conn = Connection::open(&db_path).map_err(|e| e.to_string())?;
 
@@ -237,11 +291,7 @@ impl Database {
             }
         };
 
-        let default_dl = UserDirs::new()
-            .and_then(|u| u.download_dir().map(|p| p.to_path_buf()))
-            .unwrap_or_else(|| PathBuf::from("."))
-            .to_string_lossy()
-            .to_string();
+        let default_dl = resolve_default_download_dir();
 
         let download_dir = match db.get_setting("download_dir")? {
             Some(d) => d,
