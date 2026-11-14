@@ -3,10 +3,78 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title id="pageTitle">Raydrop - Ultra-Fast & Secure P2P File Transfer (Zero Cloud Server)</title>
-  <meta name="description" id="pageDesc" content="Ultra-fast, zero-server peer-to-peer (P2P) file transfer system for Windows, macOS, and Linux. Unlimited file size, end-to-end encrypted, zero cloud storage, free & open-source." />
+  <title id="pageTitle">Raydrop — Fast, Resumable P2P File Transfer & Real-Time Sync (Zero Cloud)</title>
+  <meta name="description" id="pageDesc" content="High-speed, end-to-end encrypted peer-to-peer (P2P) file transfer across Windows, macOS, Linux, and Android. Unlimited file sizes, instant auto-resume, encrypted chat, and universal clipboard sync—100% private with zero cloud storage." />
+  <meta name="keywords" content="p2p file transfer, peer to peer file sharing, secure file transfer, local network transfer, lan file sharing, direct wan transfer, encrypted p2p chat, universal clipboard sync, zero cloud storage, open source file transfer, airdrop alternative for windows, airdrop for android and pc, fast file sharing, tauri v2, blake3 verification, chacha20-poly1305, raydrop" />
+  <meta name="author" content="Raydrop Team" />
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+  <link rel="canonical" href="https://raydrop.web.id/" />
+
+  <!-- Open Graph / Facebook / WhatsApp / Telegram / Discord -->
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Raydrop" />
+  <meta property="og:url" content="https://raydrop.web.id/" />
+  <meta property="og:title" id="ogTitle" content="Raydrop — Fast, Resumable P2P File Transfer & Real-Time Sync (Zero Cloud)" />
+  <meta property="og:description" id="ogDesc" content="High-speed, end-to-end encrypted peer-to-peer (P2P) file transfer across Windows, macOS, Linux, and Android. 100% private with zero cloud storage." />
+  <meta property="og:image" content="https://raw.githubusercontent.com/asepindrak/raydrop/main/assets/logo.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="Raydrop Logo - Universal P2P File Transfer" />
+  <meta property="og:locale" content="en_US" />
+  <meta property="og:locale:alternate" content="id_ID" />
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:url" content="https://raydrop.web.id/" />
+  <meta name="twitter:title" id="twTitle" content="Raydrop — Fast, Resumable P2P File Transfer & Real-Time Sync" />
+  <meta name="twitter:description" id="twDesc" content="End-to-end encrypted peer-to-peer file transfer across Windows, macOS, Linux, and Android with zero cloud uploads." />
+  <meta name="twitter:image" content="https://raw.githubusercontent.com/asepindrak/raydrop/main/assets/logo.png" />
+
+  <!-- Mobile & PWA Theme Colors -->
+  <meta name="theme-color" content="#0284c7" media="(prefers-color-scheme: light)" />
+  <meta name="theme-color" content="#0b0f19" media="(prefers-color-scheme: dark)" />
+  <meta name="application-name" content="Raydrop" />
+  <meta name="apple-mobile-web-app-title" content="Raydrop" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+
+  <!-- Favicons -->
   <link rel="icon" type="image/x-icon" href="/favicon.ico" />
-  
+  <link rel="icon" type="image/png" sizes="32x32" href="/icon.png" />
+  <link rel="apple-touch-icon" href="/icon.png" />
+
+  <!-- JSON-LD Structured Data Schema for Rich Search Results -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "SoftwareApplication",
+        "name": "Raydrop",
+        "operatingSystem": "Windows 10, Windows 11, macOS 11+, Linux, Android 8.0+",
+        "applicationCategory": "UtilitiesApplication",
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD"
+        },
+        "description": "High-speed, zero-cloud peer-to-peer (P2P) file transfer and real-time synchronization tool for Windows, macOS, Linux, and Android.",
+        "softwareVersion": "1.2.6",
+        "url": "https://raydrop.web.id",
+        "downloadUrl": "https://github.com/asepindrak/raydrop/releases/latest",
+        "license": "https://opensource.org/licenses/MIT",
+        "image": "https://raw.githubusercontent.com/asepindrak/raydrop/main/assets/logo.png"
+      },
+      {
+        "@type": "WebSite",
+        "name": "Raydrop",
+        "url": "https://raydrop.web.id/",
+        "description": "Universal P2P File Transfer & Real-Time Sync Across Devices with Zero Cloud Storage."
+      }
+    ]
+  }
+  </script>
+
   <!-- Fonts: Inter & Plus Jakarta Sans -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -934,7 +1002,7 @@
       <div class="hero-copy">
         <a class="badge" href="https://github.com/asepindrak/raydrop/releases/latest" target="_blank" rel="noopener">
           <span class="badge-dot"></span>
-          <span id="badgeText">New in v1.1.1: Direct Windows 11 Menu & Auto Update</span>
+          <span id="badgeText">New in v1.2.6: Universal Clipboard, Android APK & Folder Sync</span>
         </a>
 
         <h1 class="hero-title">
@@ -944,7 +1012,7 @@
         </h1>
 
         <p class="lead" data-i18n="hero_lead">
-          Transfer gigabyte to terabyte files and folders directly between PCs on local network (LAN) or internet (WAN). Zero cloud uploads, no queues, 100% private & end-to-end encrypted.
+          Transfer gigabyte to terabyte files directly between PCs, Macs, and Android phones across local Wi-Fi (LAN) or the internet (WAN). Zero cloud uploads, no file size limits, 100% private & end-to-end encrypted.
         </p>
 
         <div class="cta">
@@ -1355,18 +1423,18 @@
     // 1. Translations Dictionary (Default: EN)
     const translations = {
       en: {
-        page_title: "Raydrop - Ultra-Fast & Secure P2P File Transfer (Zero Cloud Server)",
-        page_desc: "Ultra-fast, zero-server peer-to-peer (P2P) file transfer system for Windows. Unlimited file size, end-to-end encrypted, zero cloud storage, free & open-source.",
+        page_title: "Raydrop — Fast, Resumable P2P File Transfer & Real-Time Sync (Zero Cloud)",
+        page_desc: "High-speed, end-to-end encrypted peer-to-peer (P2P) file transfer across Windows, macOS, Linux, and Android. Unlimited file sizes, instant auto-resume, encrypted chat, and universal clipboard sync—100% private with zero cloud storage.",
         nav_how: "How it Works",
         nav_features: "Features",
         nav_download: "Download",
         nav_cta: "Download Free",
         badge_prefix: "New in ",
-        badge_suffix: ": Android APK, Folder Sync & Universal Clipboard",
+        badge_suffix: ": Universal Clipboard, Android APK & Folder Sync",
         hero_kicker: "Ultra-Fast & Secure P2P File Transfer",
         hero_h1_part1: "Send. Receive.",
         hero_h1_gradient: "Without Limits.",
-        hero_lead: "Transfer gigabyte to terabyte files and folders directly between PCs on local network (LAN) or internet (WAN). Zero cloud uploads, no queues, 100% private & end-to-end encrypted.",
+        hero_lead: "Transfer gigabyte to terabyte files directly between PCs, Macs, and Android phones across local Wi-Fi (LAN) or the internet (WAN). Zero cloud uploads, no file size limits, 100% private & end-to-end encrypted.",
         hero_cta_dl: "Download for Windows",
         hero_cta_github: "GitHub Repository",
         hero_meta_mit: "Free & Open Source (MIT)",
@@ -1420,18 +1488,18 @@
         footer_status_online: "Active"
       },
       id: {
-        page_title: "Raydrop - Transfer File P2P Super Cepat & Aman (Zero Server)",
-        page_desc: "Aplikasi transfer file dan folder peer-to-peer (P2P) ultra cepat untuk Windows, macOS, Linux, dan Android. Tanpa batas ukuran, tanpa upload ke cloud server, terenkripsi end-to-end, gratis dan open-source.",
+        page_title: "Raydrop — Transfer File P2P Cepat, Aman & Tanpa Server Cloud (Multiplatform)",
+        page_desc: "Aplikasi transfer file dan folder peer-to-peer (P2P) berkecepatan tinggi dan terenkripsi end-to-end untuk Windows, macOS, Linux, dan Android. Tanpa batas ukuran, auto-resume instan, chat terenkripsi, dan sinkronisasi clipboard—100% privat tanpa cloud.",
         nav_how: "Cara Kerja",
         nav_features: "Fitur",
         nav_download: "Unduh",
         nav_cta: "Unduh Gratis",
         badge_prefix: "Baru di ",
-        badge_suffix: ": Rilis Android APK, Sinkronisasi Folder & Universal Clipboard",
-        hero_kicker: "Aplikasi Transfer File P2P Tercepat & Teraman",
+        badge_suffix: ": Universal Clipboard, Rilis Android APK & Sinkronisasi Folder",
+        hero_kicker: "Aplikasi Transfer File P2P Cepat, Aman & Privat",
         hero_h1_part1: "Kirim. Terima.",
         hero_h1_gradient: "Tanpa Batas.",
-        hero_lead: "Transfer file dan folder ukuran gigabyte hingga terabyte langsung antar komputer di jaringan lokal (LAN) maupun internet (WAN). Tanpa upload ke server cloud, tanpa antrean, 100% aman & terenkripsi.",
+        hero_lead: "Transfer file dan folder gigabyte hingga terabyte langsung antar komputer dan HP di jaringan lokal (LAN) maupun internet (WAN). Tanpa upload ke server cloud, tanpa batasan ukuran, 100% privat & terenkripsi.",
         hero_cta_dl: "Unduh Raydrop",
         hero_cta_github: "Repository GitHub",
         hero_meta_mit: "Gratis & Open Source (MIT)",
@@ -1487,7 +1555,7 @@
     };
 
     let currentLang = 'en';
-    let currentTag = 'v1.1.1';
+    let currentTag = 'v1.2.6';
 
     function changeLanguage(lang) {
       if (!translations[lang]) return;
@@ -1502,6 +1570,10 @@
       // Update page title & meta
       document.getElementById('pageTitle').innerText = translations[lang].page_title;
       document.getElementById('pageDesc').setAttribute('content', translations[lang].page_desc);
+      if (document.getElementById('ogTitle')) document.getElementById('ogTitle').setAttribute('content', translations[lang].page_title);
+      if (document.getElementById('ogDesc')) document.getElementById('ogDesc').setAttribute('content', translations[lang].page_desc);
+      if (document.getElementById('twTitle')) document.getElementById('twTitle').setAttribute('content', translations[lang].page_title);
+      if (document.getElementById('twDesc')) document.getElementById('twDesc').setAttribute('content', translations[lang].page_desc);
 
       // Update badge
       document.getElementById('badgeText').innerText = translations[lang].badge_prefix + currentTag + translations[lang].badge_suffix;
