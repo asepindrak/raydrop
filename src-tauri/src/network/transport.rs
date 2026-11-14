@@ -70,6 +70,7 @@ pub fn process_incoming_clipboard_if_trusted(
     };
 
     if is_trusted {
+        #[cfg(not(any(target_os = "android", target_os = "ios")))]
         if let Ok(mut cb) = arboard::Clipboard::new() {
             let _ = cb.set_text(content);
         }

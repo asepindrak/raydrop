@@ -1277,14 +1277,29 @@ pub fn stop_web_share(state: State<'_, Arc<AppState>>) -> Result<(), String> {
 
 #[tauri::command]
 pub fn read_system_clipboard() -> Result<String, String> {
-    let mut cb = arboard::Clipboard::new().map_err(|e| format!("Clipboard error: {e}"))?;
-    cb.get_text().map_err(|e| format!("Clipboard read error: {e}"))
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    {
+        let mut cb = arboard::Clipboard::new().map_err(|e| format!("Clipboard error: {e}"))?;
+        cb.get_text().map_err(|e| format!("Clipboard read error: {e}"))
+    }
+    #[cfg(any(target_os = "android", target_os = "ios"))]
+    {
+        Err("Clipboard read is not supported on mobile native backend".to_string())
+    }
 }
 
 #[tauri::command]
 pub fn write_system_clipboard(text: String) -> Result<(), String> {
-    let mut cb = arboard::Clipboard::new().map_err(|e| format!("Clipboard error: {e}"))?;
-    cb.set_text(text).map_err(|e| format!("Clipboard write error: {e}"))
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    {
+        let mut cb = arboard::Clipboard::new().map_err(|e| format!("Clipboard error: {e}"))?;
+        cb.set_text(text).map_err(|e| format!("Clipboard write error: {e}"))
+    }
+    #[cfg(any(target_os = "android", target_os = "ios"))]
+    {
+        let _ = text;
+        Ok(())
+    }
 }
 
 #[tauri::command]
