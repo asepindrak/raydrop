@@ -3,7 +3,8 @@
   import { activeTransfers, historicalTransfers } from '../stores/transfers';
   import { appSettings, cliQueuedFiles, activeMainTab } from '../stores/state';
   import { contacts, lanContacts } from '../stores/contacts';
-  import { raydropApi, formatBytes, type TransferRecord } from '../utils/tauri-ipc';
+  import { raydropApi, formatBytes, type TransferRecord, type WebShareInfo } from '../utils/tauri-ipc';
+  import WebShareModal from './WebShareModal.svelte';
   import {
     ArrowUpRight,
     ArrowDownLeft,
@@ -30,6 +31,7 @@
     Radio,
     Copy,
     Check,
+    QrCode,
   } from 'lucide-svelte';
 
   let resumingId = '';
@@ -37,6 +39,7 @@
   let expandedTransferIds: Record<string, boolean> = {};
   let transferFilter: 'all' | 'incoming' | 'outgoing' = 'all';
   let isDraggingOver = false;
+  let webShareInfo: WebShareInfo | null = null;
 
   function toggleExpanded(id: string) {
     expandedTransferIds = {
@@ -178,6 +181,22 @@
     }
   }
 
+  async function handleShareViaWeb() {
+    try {
+      const picked = await open({
+        multiple: true,
+        title: 'Select Files or Folder to Share to Phone / Web',
+      });
+      if (picked) {
+        const list = Array.isArray(picked) ? picked : [picked];
+        const info = await raydropApi.startWebShare(list);
+        webShareInfo = info;
+      }
+    } catch (e: any) {
+      actionError = e?.toString() || 'Failed to start Web Share';
+    }
+  }
+
   async function handleQuickSendToPeer(peerDeviceId: string) {
     try {
       const picked = await open({
@@ -254,6 +273,16 @@
       >
         <FolderUp class="w-4 h-4 text-cyan-400" />
         <span>Send Folder</span>
+      </button>
+
+      <button
+        type="button"
+        on:click={handleShareViaWeb}
+        class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-purple-600/80 to-pink-600/80 hover:from-purple-500 hover:to-pink-500 text-white font-semibold text-sm border border-purple-500/30 transition-all hover:-translate-y-0.5 shadow-lg shadow-purple-500/20"
+        title="Share files to phone or any device via QR code (no app needed)"
+      >
+        <QrCode class="w-4 h-4 text-purple-200" />
+        <span>Share to Phone</span>
       </button>
     </div>
 
@@ -616,6 +645,15 @@
               <Radio class="w-4 h-4 text-cyan-400" />
               <span>Scan LAN Radar</span>
             </button>
+
+            <button
+              type="button"
+              on:click={handleShareViaWeb}
+              class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 text-purple-200 text-xs font-semibold border border-purple-500/40 transition"
+            >
+              <QrCode class="w-4 h-4 text-purple-300" />
+              <span>Share to Phone (QR Code)</span>
+            </button>
           </div>
         </div>
       {:else if filteredHistory.length === 0}
@@ -749,4 +787,13 @@
       {/if}
     </div>
   </div>
+
+  {#if webShareInfo}
+    <WebShareModal
+      shareInfo={webShareInfo}
+      onClose={() => {
+        webShareInfo = null;
+      }}
+    />
+  {/if}
 </div>

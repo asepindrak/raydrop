@@ -130,6 +130,23 @@ export interface ChatMessage {
   created_at: number;
 }
 
+export interface WebShareItem {
+  id: number;
+  name: string;
+  size_bytes: number;
+  size_human: string;
+}
+
+export interface WebShareInfo {
+  url: string;
+  local_ip: string;
+  port: number;
+  total_files: number;
+  total_bytes: number;
+  total_bytes_human: string;
+  files: WebShareItem[];
+}
+
 export interface TransferProgressEvent {
   session_id: string;
   peer_device_id: string;
@@ -265,6 +282,9 @@ export const raydropApi = {
     invoke<void>('open_external_url', { url }),
   getFileThumbnail: (path: string) =>
     invoke<string>('get_file_thumbnail', { path }),
+  startWebShare: (paths: string[]) =>
+    invoke<WebShareInfo>('start_web_share', { paths }),
+  stopWebShare: () => invoke<void>('stop_web_share'),
   listenEvent: <T>(event: string, handler: (payload: T) => void): Promise<UnlistenFn> =>
     listen<T>(event, (e) => handler(e.payload)),
 };

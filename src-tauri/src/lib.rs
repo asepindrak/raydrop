@@ -75,6 +75,7 @@ pub fn run() {
         active_cancellations: Mutex::new(HashMap::new()),
         pending_wan_candidates: Mutex::new(HashMap::new()),
         queued_cli_files: Mutex::new(initial_send_paths.clone()),
+        active_web_share: Mutex::new(None),
     });
 
     let state_for_single_instance = app_state.clone();
@@ -298,6 +299,8 @@ pub fn run() {
             commands::update_tray_badge,
             commands::open_external_url,
             commands::get_file_thumbnail,
+            commands::start_web_share,
+            commands::stop_web_share,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Raydrop Tauri application");

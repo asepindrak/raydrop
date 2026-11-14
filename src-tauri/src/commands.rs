@@ -1246,3 +1246,18 @@ pub fn open_external_url(url: String) -> Result<(), String> {
     Ok(())
 }
 
+#[tauri::command]
+pub async fn start_web_share(
+    app: AppHandle,
+    state: State<'_, Arc<AppState>>,
+    paths: Vec<String>,
+) -> Result<crate::network::web_share::WebShareInfo, String> {
+    crate::network::web_share::start_web_share_server(app, state.inner().clone(), paths).await
+}
+
+#[tauri::command]
+pub fn stop_web_share(state: State<'_, Arc<AppState>>) -> Result<(), String> {
+    crate::network::web_share::stop_web_share_server(&state);
+    Ok(())
+}
+

@@ -44,6 +44,7 @@ pub struct AppState {
     pub active_cancellations: Mutex<HashMap<String, Arc<AtomicBool>>>,
     pub pending_wan_candidates: Mutex<HashMap<String, oneshot::Sender<WanCandidateResponse>>>,
     pub queued_cli_files: Mutex<Vec<String>>,
+    pub active_web_share: Mutex<Option<Arc<AtomicBool>>>,
 }
 
 impl AppState {
