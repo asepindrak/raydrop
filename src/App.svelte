@@ -235,53 +235,69 @@
       },
     );
 
-    await raydropApi.listenEvent<ChatMessage>("chat_message_received", async (msg) => {
-      handleIncomingChatMessage(msg);
-      if ($activeMainTab === "chat" && $activeChatPeerId === msg.peer_device_id) {
-        await markChatRead(msg.peer_device_id);
-      } else {
-        const contactList = get(contacts);
-        const peer = contactList.find((c) => c.device_id === msg.peer_device_id);
-        const peerName = peer?.alias_name || peer?.user_name || msg.peer_device_id.slice(0, 14);
-        addChatToast(msg, peerName);
+    await raydropApi.listenEvent<ChatMessage>(
+      "chat_message_received",
+      async (msg) => {
+        handleIncomingChatMessage(msg);
+        if (
+          $activeMainTab === "chat" &&
+          $activeChatPeerId === msg.peer_device_id
+        ) {
+          await markChatRead(msg.peer_device_id);
+        } else {
+          const contactList = get(contacts);
+          const peer = contactList.find(
+            (c) => c.device_id === msg.peer_device_id,
+          );
+          const peerName =
+            peer?.alias_name ||
+            peer?.user_name ||
+            msg.peer_device_id.slice(0, 14);
+          addChatToast(msg, peerName);
 
-        try {
-          const win = getCurrentWindow();
-          await win.requestUserAttention(UserAttentionType.Informational);
-        } catch (_) {}
-      }
-    });
+          try {
+            const win = getCurrentWindow();
+            await win.requestUserAttention(UserAttentionType.Informational);
+          } catch (_) {}
+        }
+      },
+    );
 
-    await raydropApi.listenEvent<ClipboardSyncedPayload>("clipboard_synced", async (payload) => {
-      const isImg = payload.content.startsWith("data:image/") || (payload as any).is_image;
-      const preview = isImg
-        ? "🖼️ [Gambar Clipboard - Siap di-Paste (Ctrl+V)]"
-        : payload.content.length > 50
-        ? payload.content.slice(0, 50) + "..."
-        : payload.content;
+    await raydropApi.listenEvent<ClipboardSyncedPayload>(
+      "clipboard_synced",
+      async (payload) => {
+        const isImg =
+          payload.content.startsWith("data:image/") ||
+          (payload as any).is_image;
+        const preview = isImg
+          ? "🖼️ [Gambar Clipboard - Siap di-Paste (Ctrl+V)]"
+          : payload.content.length > 50
+            ? payload.content.slice(0, 50) + "..."
+            : payload.content;
 
-      // Ensure system clipboard also receives text if supported on Web / WebView
-      if (!isImg && navigator.clipboard && navigator.clipboard.writeText) {
-        try {
-          await navigator.clipboard.writeText(payload.content);
-        } catch (_) {}
-      }
+        // Ensure system clipboard also receives text if supported on Web / WebView
+        if (!isImg && navigator.clipboard && navigator.clipboard.writeText) {
+          try {
+            await navigator.clipboard.writeText(payload.content);
+          } catch (_) {}
+        }
 
-      addChatToast(
-        {
-          id: "clip-" + Date.now(),
-          peer_device_id: payload.from_device_id,
-          direction: "incoming",
-          content: payload.auto_copied
-            ? `📋 [Auto-Copied] ${preview}`
-            : `📋 [Shared] ${preview}`,
-          msg_type: "clipboard",
-          is_read: true,
-          created_at: Math.floor(Date.now() / 1000),
-        },
-        payload.sender_alias
-      );
-    });
+        addChatToast(
+          {
+            id: "clip-" + Date.now(),
+            peer_device_id: payload.from_device_id,
+            direction: "incoming",
+            content: payload.auto_copied
+              ? `📋 [Auto-Copied] ${preview}`
+              : `📋 [Shared] ${preview}`,
+            msg_type: "clipboard",
+            is_read: true,
+            created_at: Math.floor(Date.now() / 1000),
+          },
+          payload.sender_alias,
+        );
+      },
+    );
 
     await raydropApi.listenEvent<string>("open_file_requested", (filePath) => {
       addChatToast(
@@ -294,24 +310,27 @@
           is_read: true,
           created_at: Math.floor(Date.now() / 1000),
         },
-        "Raydrop Storage"
+        "Raydrop Storage",
       );
     });
 
-    await raydropApi.listenEvent<string>("open_folder_requested", (folderPath) => {
-      addChatToast(
-        {
-          id: "open-folder-" + Date.now(),
-          peer_device_id: "local",
-          direction: "incoming",
-          content: `📁 File tersimpan di folder Download (${folderPath}). Buka aplikasi Files / Pengelola File untuk mengaksesnya.`,
-          msg_type: "text",
-          is_read: true,
-          created_at: Math.floor(Date.now() / 1000),
-        },
-        "Raydrop Storage"
-      );
-    });
+    await raydropApi.listenEvent<string>(
+      "open_folder_requested",
+      (folderPath) => {
+        addChatToast(
+          {
+            id: "open-folder-" + Date.now(),
+            peer_device_id: "local",
+            direction: "incoming",
+            content: `📁 File tersimpan di folder Download (${folderPath}). Buka aplikasi Files / Pengelola File untuk mengaksesnya.`,
+            msg_type: "text",
+            is_read: true,
+            created_at: Math.floor(Date.now() / 1000),
+          },
+          "Raydrop Storage",
+        );
+      },
+    );
 
     // Native OS Drag and Drop multiple files/folders listener
     try {
@@ -339,9 +358,12 @@
     }, 2500);
 
     // Periodically re-check for updates every 30 minutes while running in background/tray
-    const updateInterval = setInterval(() => {
-      checkForUpdates(false).catch(() => {});
-    }, 30 * 60 * 1000);
+    const updateInterval = setInterval(
+      () => {
+        checkForUpdates(false).catch(() => {});
+      },
+      30 * 60 * 1000,
+    );
 
     // Re-check whenever the user unhides or focuses the Raydrop window from tray
     const handleWindowFocus = () => {
@@ -376,14 +398,29 @@
   <Header />
 
   <!-- Main View: FULL width & height for Transfers & Streams, or active tab -->
-  <main class="flex-1 w-full p-2 sm:p-4 pb-16 md:pb-4 overflow-hidden relative z-10 flex flex-col min-h-0">
-    <div class="h-full w-full {$activeMainTab === 'transfers' ? 'flex flex-col' : 'hidden'}">
+  <main
+    class="flex-1 w-full p-2 sm:p-4 pb-16 md:pb-4 overflow-hidden relative z-10 flex flex-col min-h-0"
+  >
+    <div
+      class="h-full w-full {$activeMainTab === 'transfers'
+        ? 'flex flex-col'
+        : 'hidden'}"
+    >
       <ActiveTransfers />
     </div>
-    <div class="h-full w-full {$activeMainTab === 'chat' ? 'flex flex-col' : 'hidden'}">
+    <div
+      class="h-full w-full {$activeMainTab === 'chat'
+        ? 'flex flex-col'
+        : 'hidden'}"
+    >
       <ChatView />
     </div>
-    <div class="h-full w-full {$activeMainTab !== 'transfers' && $activeMainTab !== 'chat' ? 'flex flex-col' : 'hidden'}">
+    <div
+      class="h-full w-full {$activeMainTab !== 'transfers' &&
+      $activeMainTab !== 'chat'
+        ? 'flex flex-col'
+        : 'hidden'}"
+    >
       <ContactList />
     </div>
   </main>
@@ -419,7 +456,9 @@
 
   <!-- In-app Floating Chat Toast Notifications (Bottom-Right) -->
   {#if $chatToasts.length > 0}
-    <div class="fixed bottom-6 right-6 z-50 flex flex-col gap-2.5 max-w-sm pointer-events-auto">
+    <div
+      class="fixed bottom-6 right-6 z-50 flex flex-col gap-2.5 max-w-sm pointer-events-auto"
+    >
       {#each $chatToasts as toast (toast.id)}
         <div
           role="button"
@@ -439,13 +478,19 @@
           class="p-4 rounded-2xl bg-slate-900/95 border border-cyan-500/50 shadow-2xl shadow-cyan-500/20 backdrop-blur-xl flex items-start justify-between gap-3 cursor-pointer hover:border-cyan-400 hover:scale-[1.02] transition-all transform animate-in slide-in-from-bottom duration-200"
         >
           <div class="flex items-start gap-3 min-w-0">
-            <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-cyan-500/20 to-indigo-500/20 border border-cyan-500/40 flex items-center justify-center text-cyan-300 font-bold text-xs shrink-0 mt-0.5">
+            <div
+              class="w-9 h-9 rounded-xl bg-gradient-to-tr from-cyan-500/20 to-indigo-500/20 border border-cyan-500/40 flex items-center justify-center text-cyan-300 font-bold text-xs shrink-0 mt-0.5"
+            >
               {toast.peerName.slice(0, 2).toUpperCase()}
             </div>
             <div class="min-w-0">
               <div class="flex items-center gap-1.5">
-                <span class="text-xs font-bold text-white truncate">{toast.peerName}</span>
-                <span class="text-[10px] text-cyan-400 font-mono">Pesan Baru</span>
+                <span class="text-xs font-bold text-white truncate"
+                  >{toast.peerName}</span
+                >
+                <span class="text-[10px] text-cyan-400 font-mono"
+                  >Pesan Baru</span
+                >
               </div>
               <p class="text-xs text-slate-300 truncate mt-0.5 max-w-[220px]">
                 {toast.content}
@@ -473,19 +518,24 @@
   <UpdateModal />
 
   <!-- Mobile Bottom Navigation Bar (md:hidden) -->
-  <nav class="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-slate-950/95 border-t border-slate-800/90 backdrop-blur-xl px-2 py-1.5 flex items-center justify-around shadow-2xl">
+  <nav
+    class="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-slate-950/95 border-t border-slate-800/90 backdrop-blur-xl px-2 py-1.5 flex items-center justify-around shadow-2xl"
+  >
     <!-- 1. Transfers -->
     <button
       type="button"
-      on:click={() => activeMainTab.set('transfers')}
-      class="flex flex-col items-center gap-0.5 px-3 py-1 rounded-xl transition-all {$activeMainTab === 'transfers'
+      on:click={() => activeMainTab.set("transfers")}
+      class="flex flex-col items-center gap-0.5 px-3 py-1 rounded-xl transition-all {$activeMainTab ===
+      'transfers'
         ? 'text-cyan-400 font-bold'
         : 'text-slate-400 hover:text-slate-200'}"
     >
       <div class="relative">
         <Zap class="w-5 h-5" />
         {#if $activeTransfers.length > 0}
-          <span class="absolute -top-1 -right-2 w-3.5 h-3.5 rounded-full bg-cyan-400 text-slate-950 text-[9px] font-bold flex items-center justify-center animate-pulse">
+          <span
+            class="absolute -top-1 -right-2 w-3.5 h-3.5 rounded-full bg-cyan-400 text-slate-950 text-[9px] font-bold flex items-center justify-center animate-pulse"
+          >
             {$activeTransfers.length}
           </span>
         {/if}
@@ -496,15 +546,18 @@
     <!-- 2. Chat -->
     <button
       type="button"
-      on:click={() => activeMainTab.set('chat')}
-      class="flex flex-col items-center gap-0.5 px-3 py-1 rounded-xl transition-all {$activeMainTab === 'chat'
+      on:click={() => activeMainTab.set("chat")}
+      class="flex flex-col items-center gap-0.5 px-3 py-1 rounded-xl transition-all {$activeMainTab ===
+      'chat'
         ? 'text-cyan-400 font-bold'
         : 'text-slate-400 hover:text-slate-200'}"
     >
       <div class="relative">
         <MessageSquare class="w-5 h-5" />
         {#if $totalUnreadCount > 0}
-          <span class="absolute -top-1 -right-2 w-3.5 h-3.5 rounded-full bg-rose-500 text-white text-[9px] font-bold flex items-center justify-center animate-pulse">
+          <span
+            class="absolute -top-1 -right-2 w-3.5 h-3.5 rounded-full bg-rose-500 text-white text-[9px] font-bold flex items-center justify-center animate-pulse"
+          >
             {$totalUnreadCount}
           </span>
         {/if}
@@ -515,15 +568,18 @@
     <!-- 3. LAN Radar -->
     <button
       type="button"
-      on:click={() => activeMainTab.set('lan')}
-      class="flex flex-col items-center gap-0.5 px-3 py-1 rounded-xl transition-all {$activeMainTab === 'lan'
+      on:click={() => activeMainTab.set("lan")}
+      class="flex flex-col items-center gap-0.5 px-3 py-1 rounded-xl transition-all {$activeMainTab ===
+      'lan'
         ? 'text-cyan-400 font-bold'
         : 'text-slate-400 hover:text-slate-200'}"
     >
       <div class="relative">
         <Wifi class="w-5 h-5" />
         {#if $lanContacts.length > 0}
-          <span class="absolute -top-1 -right-2 w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span
+            class="absolute -top-1 -right-2 w-2 h-2 rounded-full bg-emerald-400 animate-pulse"
+          ></span>
         {/if}
       </div>
       <span class="text-[10px]">Radar</span>
@@ -532,8 +588,9 @@
     <!-- 4. Contacts -->
     <button
       type="button"
-      on:click={() => activeMainTab.set('contacts')}
-      class="flex flex-col items-center gap-0.5 px-3 py-1 rounded-xl transition-all {$activeMainTab === 'contacts'
+      on:click={() => activeMainTab.set("contacts")}
+      class="flex flex-col items-center gap-0.5 px-3 py-1 rounded-xl transition-all {$activeMainTab ===
+      'contacts'
         ? 'text-cyan-400 font-bold'
         : 'text-slate-400 hover:text-slate-200'}"
     >

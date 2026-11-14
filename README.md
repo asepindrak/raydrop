@@ -76,12 +76,15 @@ Unlike traditional file-sharing services that upload your files to third-party c
 - **Direct File Launch:** Open shared files directly from chat bubbles with system default apps or reveal them in Windows Explorer with 1 click.
 - **Zero Server Storage & Zero Server DB:** Chat history is stored 100% locally on each peer's private SQLite database. The server never stores chat messages or conversation logs.
 
-### 📋 Universal Clipboard, Folder Mirroring & Speed Controls (New in v1.2.5)
-- **Universal Clipboard Sharing:** Instantly share text, links, code snippets, or clipboard images across any connected device with one click or automatic synchronization.
+### 📋 Seamless Universal Clipboard & Mobile Enhancements (New in v1.2.6)
+- **Instant Cross-Device Auto-Paste:** When clipboard syncing is triggered to trusted devices, received text and images are automatically injected straight into the recipient's OS system clipboard—ready for immediate `Ctrl+V` (or mobile paste) in any application without manual copying.
+- **Full Clipboard Image & Screenshot Sync:** Copy screenshots or image files directly to your clipboard on one device, sync via Raydrop, and immediately paste the native image bitmap into Photoshop, browser apps, messaging tools, or documents on other devices.
+- **Smart Magic-Bytes File Recognition for Android:** Automatic binary inspection (JPEG, PNG, GIF, WebP, PDF, MP4, MP3, ZIP, etc.) ensures files chosen from Android media pickers receive accurate extensions and clean filenames (`Image_...`, `Video_...`, etc.) instead of generic `.bin` files.
+- **Multi-File Selection on Mobile:** Select multiple files from Android phones and tablets with an interactive "+ Add More" queue manager prior to dispatch.
+- **Android Storage & Folder Guidance:** Seamless Open File and Open Folder actions with direct feedback pointing to the device's native Download storage (`/storage/emulated/0/Download`).
 - **Precision Bandwidth Speed Limiter (QoS):** Cap outgoing and incoming transfer speeds (e.g. 10 MB/s, 25 MB/s, 50 MB/s, or Custom) to avoid saturating limited Wi-Fi connections or shared office networks.
 - **One-Way Folder Sync / Mirroring Mode:** Define persistent folder pairing tasks to automatically sync source changes to a remote destination folder without manual re-selection.
 - **Instant Web Share via QR Code:** Share files to any mobile phone or computer without installing the app; simply scan a dynamic QR code on the same Wi-Fi to download via a high-speed local HTTP streaming server.
-- **Mobile Responsive Layout & Android Support:** Fully responsive mobile layout featuring bottom navigation, touch-friendly transfer cards, and native Android APK builds.
 
 ---
 
@@ -120,11 +123,11 @@ Pre-built native packages for **Windows**, **macOS**, **Linux**, and **Android**
 
 | Platform | Format | Architecture | Description | Download |
 | :--- | :---: | :---: | :--- | :---: |
-| **Windows** | `.msi` | x64 (64-bit) | Official Windows 10/11 installer with desktop shortcut, background tray, and Explorer context menu integration. | [Download MSI](https://github.com/asepindrak/raydrop/releases/download/v1.2.5/Raydrop_1.2.5_x64_en-US.msi) |
-| **macOS** | `.dmg` | Universal (Apple Silicon & Intel) | Drag-and-drop installer for macOS 11.0+. Native Universal binary supporting Apple Silicon (M1-M4) & Intel. | [Download DMG](https://github.com/asepindrak/raydrop/releases/download/v1.2.5/Raydrop_1.2.5_universal.dmg) |
-| **Linux (Debian / Ubuntu)** | `.deb` | x64 (amd64) | Debian, Ubuntu, and Linux Mint package with application menu integration and native WebKitGTK runtime. | [Download DEB](https://github.com/asepindrak/raydrop/releases/download/v1.2.5/Raydrop_1.2.5_amd64.deb) |
-| **Linux (Universal)** | `.AppImage` | x64 (amd64) | Standalone portable executable for Fedora, Arch Linux, openSUSE, and any standard Linux distribution. | [Download AppImage](https://github.com/asepindrak/raydrop/releases/download/v1.2.5/Raydrop_1.2.5_amd64.AppImage) |
-| **Android** | `.apk` | ARM64 (`arm64-v8a`) | Native Android APK for phones and tablets. Direct high-speed local Wi-Fi transfer, mobile bottom navigation, and universal clipboard. | [Download APK](https://github.com/asepindrak/raydrop/releases/download/v1.2.5/Raydrop-arm64-v8a.apk) |
+| **Windows** | `.msi` | x64 (64-bit) | Official Windows 10/11 installer with desktop shortcut, background tray, and Explorer context menu integration. | [Download MSI](https://github.com/asepindrak/raydrop/releases/download/v1.2.6/Raydrop_1.2.6_x64_en-US.msi) |
+| **macOS** | `.dmg` | Universal (Apple Silicon & Intel) | Drag-and-drop installer for macOS 11.0+. Native Universal binary supporting Apple Silicon (M1-M4) & Intel. | [Download DMG](https://github.com/asepindrak/raydrop/releases/download/v1.2.6/Raydrop_1.2.6_universal.dmg) |
+| **Linux (Debian / Ubuntu)** | `.deb` | x64 (amd64) | Debian, Ubuntu, and Linux Mint package with application menu integration and native WebKitGTK runtime. | [Download DEB](https://github.com/asepindrak/raydrop/releases/download/v1.2.6/Raydrop_1.2.6_amd64.deb) |
+| **Linux (Universal)** | `.AppImage` | x64 (amd64) | Standalone portable executable for Fedora, Arch Linux, openSUSE, and any standard Linux distribution. | [Download AppImage](https://github.com/asepindrak/raydrop/releases/download/v1.2.6/Raydrop_1.2.6_amd64.AppImage) |
+| **Android** | `.apk` | ARM64 (`arm64-v8a`) | Native Android APK for phones and tablets. Direct high-speed local Wi-Fi transfer, mobile bottom navigation, and universal clipboard. | [Download APK](https://github.com/asepindrak/raydrop/releases/download/v1.2.6/Raydrop-arm64-v8a.apk) |
 
 👉 **[View All Release Assets on GitHub Releases](https://github.com/asepindrak/raydrop/releases/latest)** &bull; **[Visit Raydrop Website (raydrop.web.id)](https://raydrop.web.id)**
 
