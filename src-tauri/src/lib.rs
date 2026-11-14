@@ -304,6 +304,7 @@ pub fn run() {
             commands::read_system_clipboard,
             commands::write_system_clipboard,
             commands::broadcast_clipboard,
+            commands::set_speed_limit,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Raydrop Tauri application");

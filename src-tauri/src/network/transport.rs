@@ -2125,6 +2125,8 @@ where
                 }
                 drop(frame_tx);
 
+                let mut chunk_start_time = Instant::now();
+
                 while let Some(frame_res) = frame_rx.recv().await {
                     if cancel_s.load(Ordering::Relaxed) {
                         let _ = stop_tx.try_send(());
@@ -2165,6 +2167,19 @@ where
                     }
 
                     local_sent_bytes = (local_sent_bytes + plain_len as u64).min(total_bytes);
+
+                    // Bandwidth Speed Limiter (QoS chunk-level throttling)
+                    let speed_limit = state_s.settings.lock().map(|s| s.speed_limit_mbps).unwrap_or(0);
+                    if speed_limit > 0 {
+                        let bytes_per_sec = (speed_limit as f64) * 1024.0 * 1024.0;
+                        let min_duration_sec = (plain_len as f64) / bytes_per_sec;
+                        let chunk_elapsed = chunk_start_time.elapsed().as_secs_f64();
+                        if chunk_elapsed < min_duration_sec {
+                            let sleep_sec = min_duration_sec - chunk_elapsed;
+                            tokio::time::sleep(Duration::from_secs_f64(sleep_sec)).await;
+                        }
+                    }
+                    chunk_start_time = Instant::now();
 
                     let effective_bytes = if has_ack_s.load(Ordering::Relaxed) {
                         let a = acked_s.load(Ordering::Relaxed);

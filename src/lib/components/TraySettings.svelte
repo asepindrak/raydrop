@@ -13,6 +13,7 @@
     Power,
     RefreshCw,
     Sparkles,
+    Gauge,
   } from "lucide-svelte";
 
   let aliasName = "";
@@ -20,6 +21,7 @@
   let signalingUrl = "";
   let stunAddr = "";
   let autostart = true;
+  let speedLimitMbps = 0;
   let win11DirectMenu = false;
   let statusBanner = "";
 
@@ -29,6 +31,7 @@
     signalingUrl = $appSettings.signaling_url;
     stunAddr = $appSettings.stun_addr;
     autostart = $appSettings.autostart ?? true;
+    speedLimitMbps = $appSettings.speed_limit_mbps ?? 0;
     raydropApi.getWin11DirectMenu().then((res) => (win11DirectMenu = res)).catch(() => {});
   }
 
@@ -51,10 +54,26 @@
       signalingUrl,
       stunAddr,
       autostart,
+      speedLimitMbps,
     });
     appSettings.set(updated);
     statusBanner = "Settings saved! Autorun & Signaling configuration updated.";
     setTimeout(() => (statusBanner = ""), 3000);
+  }
+
+  async function handleSpeedLimitChange(val: number) {
+    speedLimitMbps = val;
+    try {
+      await raydropApi.setSpeedLimit(val);
+      appSettings.update((s) => ({ ...s, speed_limit_mbps: val }));
+      statusBanner =
+        val === 0
+          ? "Speed limit removed (Unlimited Max Speed)."
+          : `Outgoing transfer speed limited to ${val} MB/s.`;
+      setTimeout(() => (statusBanner = ""), 2500);
+    } catch (err: any) {
+      statusBanner = `Speed limit error: ${String(err)}`;
+    }
   }
 
   async function handleToggleAutostart() {
@@ -188,6 +207,46 @@
               placeholder="stun.raydrop.web.id:3478"
               class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono text-cyan-300 focus:outline-none focus:border-cyan-500"
             />
+          </div>
+        </div>
+
+        <!-- Bandwidth Speed Limiter (QoS) -->
+        <div
+          class="p-3.5 rounded-xl bg-slate-950/90 border border-slate-800 flex flex-col gap-2.5"
+        >
+          <div class="flex items-center justify-between">
+            <div>
+              <p
+                class="text-xs font-semibold text-slate-200 flex items-center gap-1.5"
+              >
+                <Gauge class="w-3.5 h-3.5 text-cyan-400" />
+                <span>Bandwidth Speed Limiter (QoS)</span>
+              </p>
+              <p class="text-[11px] text-slate-400 mt-0.5">
+                Cap outgoing transfer speeds so transfers don't saturate home or office Wi-Fi.
+              </p>
+            </div>
+            <span
+              class="text-xs font-mono font-bold px-2.5 py-0.5 rounded-full {speedLimitMbps === 0
+                ? 'bg-cyan-500/15 text-cyan-300 border border-cyan-500/30'
+                : 'bg-amber-500/15 text-amber-300 border border-amber-500/30'}"
+            >
+              {speedLimitMbps === 0 ? "Unlimited" : `${speedLimitMbps} MB/s`}
+            </span>
+          </div>
+
+          <div class="flex items-center gap-1.5 flex-wrap pt-1">
+            {#each [0, 5, 10, 25, 50] as preset}
+              <button
+                type="button"
+                on:click={() => handleSpeedLimitChange(preset)}
+                class="px-2.5 py-1 rounded-lg text-xs font-mono font-semibold transition-all {speedLimitMbps === preset
+                  ? 'bg-cyan-500 text-slate-950 font-bold shadow-sm shadow-cyan-500/30'
+                  : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700'}"
+              >
+                {preset === 0 ? "Unlimited (Max)" : `${preset} MB/s`}
+              </button>
+            {/each}
           </div>
         </div>
 

@@ -34,6 +34,7 @@
     Check,
     QrCode,
     Clipboard,
+    Gauge,
   } from 'lucide-svelte';
 
   let resumingId = '';
@@ -43,6 +44,7 @@
   let isDraggingOver = false;
   let webShareInfo: WebShareInfo | null = null;
   let showClipboardModal = false;
+  let showSpeedLimitMenu = false;
 
   function toggleExpanded(id: string) {
     expandedTransferIds = {
@@ -412,9 +414,51 @@
           title="Open Downloads Folder ({$appSettings.download_dir})"
         >
           <FolderOpen class="w-3.5 h-3.5 text-amber-400" />
-          <span>Downloads Folder</span>
+          <span>Downloads</span>
         </button>
       {/if}
+
+      <!-- Live Speed Limiter QoS Pill -->
+      <div class="relative flex items-center">
+        <button
+          type="button"
+          on:click={() => (showSpeedLimitMenu = !showSpeedLimitMenu)}
+          class="flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-mono font-semibold transition-all {$appSettings.speed_limit_mbps
+            ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
+            : 'bg-slate-800 text-slate-300 border border-slate-700 hover:text-white'}"
+          title="Click to set transfer speed limit"
+        >
+          <Gauge class="w-3.5 h-3.5 {$appSettings.speed_limit_mbps ? 'text-amber-400' : 'text-cyan-400'}" />
+          <span>{$appSettings.speed_limit_mbps ? `${$appSettings.speed_limit_mbps} MB/s` : 'Max Speed'}</span>
+          <ChevronDown class="w-3 h-3 text-slate-400" />
+        </button>
+
+        {#if showSpeedLimitMenu}
+          <div
+            class="absolute right-0 top-full mt-2 w-48 rounded-xl bg-slate-900 border border-slate-700 shadow-2xl p-2 z-30 flex flex-col gap-1 backdrop-blur-xl"
+          >
+            <span class="text-[10px] font-mono uppercase text-slate-400 px-2 py-0.5">Speed Cap (QoS)</span>
+            {#each [0, 5, 10, 25, 50] as preset}
+              <button
+                type="button"
+                on:click={async () => {
+                  await raydropApi.setSpeedLimit(preset);
+                  appSettings.update((s) => ({ ...s, speed_limit_mbps: preset }));
+                  showSpeedLimitMenu = false;
+                }}
+                class="flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-mono transition-colors {($appSettings.speed_limit_mbps ?? 0) === preset
+                  ? 'bg-cyan-500/20 text-cyan-300 font-bold'
+                  : 'text-slate-300 hover:bg-slate-800'}"
+              >
+                <span>{preset === 0 ? '⚡ Unlimited (Max)' : `${preset} MB/s`}</span>
+                {#if ($appSettings.speed_limit_mbps ?? 0) === preset}
+                  <Check class="w-3.5 h-3.5 text-cyan-400" />
+                {/if}
+              </button>
+            {/each}
+          </div>
+        {/if}
+      </div>
     </div>
   </div>
 

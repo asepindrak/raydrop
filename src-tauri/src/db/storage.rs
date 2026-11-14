@@ -63,6 +63,7 @@ pub struct AppSettings {
     pub auth_token: Option<String>,
     pub discoverable: bool,
     pub autostart: bool,
+    pub speed_limit_mbps: u32,
     pub download_dir: String,
     pub signaling_url: String,
     pub stun_addr: String,
@@ -207,6 +208,14 @@ impl Database {
             }
         };
 
+        let speed_limit_mbps = match db.get_setting("speed_limit_mbps")? {
+            Some(s) => s.parse::<u32>().unwrap_or(0),
+            None => {
+                db.set_setting("speed_limit_mbps", "0")?;
+                0
+            }
+        };
+
         let default_dl = UserDirs::new()
             .and_then(|u| u.download_dir().map(|p| p.to_path_buf()))
             .unwrap_or_else(|| PathBuf::from("."))
@@ -248,6 +257,7 @@ impl Database {
             auth_token,
             discoverable,
             autostart,
+            speed_limit_mbps,
             download_dir,
             signaling_url,
             stun_addr,

@@ -266,6 +266,7 @@ pub fn update_settings(
     signaling_url: String,
     stun_addr: String,
     autostart: Option<bool>,
+    speed_limit_mbps: Option<u32>,
 ) -> Result<AppSettings, String> {
     let resolved_stun = if stun_addr.trim().is_empty() {
         let host = signaling_url
@@ -296,6 +297,11 @@ pub fn update_settings(
     s.signaling_url = signaling_url.trim().to_string();
     s.stun_addr = resolved_stun;
 
+    if let Some(limit) = speed_limit_mbps {
+        state.db.set_setting("speed_limit_mbps", &limit.to_string())?;
+        s.speed_limit_mbps = limit;
+    }
+
     if let Some(auto) = autostart {
         let _ = set_autostart(auto);
         state
@@ -305,6 +311,14 @@ pub fn update_settings(
     }
 
     Ok(s.clone())
+}
+
+#[tauri::command]
+pub fn set_speed_limit(state: State<'_, Arc<AppState>>, speed_limit_mbps: u32) -> Result<u32, String> {
+    state.db.set_setting("speed_limit_mbps", &speed_limit_mbps.to_string())?;
+    let mut s = state.settings.lock().map_err(|e| e.to_string())?;
+    s.speed_limit_mbps = speed_limit_mbps;
+    Ok(speed_limit_mbps)
 }
 
 #[tauri::command]

@@ -10,6 +10,7 @@ export interface AppSettings {
   auth_token: string | null;
   discoverable: boolean;
   autostart: boolean;
+  speed_limit_mbps: number;
   download_dir: string;
   signaling_url: string;
   stun_addr: string;
@@ -221,6 +222,7 @@ export const raydropApi = {
     signalingUrl: string;
     stunAddr: string;
     autostart?: boolean;
+    speedLimitMbps?: number;
   }) => invoke<AppSettings>('update_settings', params),
   getContacts: () => invoke<Contact[]>('get_contacts'),
   addWanContact: (params: {
@@ -300,6 +302,8 @@ export const raydropApi = {
       content,
       targetDeviceIds: targetDeviceIds ?? null,
     }),
+  setSpeedLimit: (speedLimitMbps: number) =>
+    invoke<number>('set_speed_limit', { speedLimitMbps }),
   listenEvent: <T>(event: string, handler: (payload: T) => void): Promise<UnlistenFn> =>
     listen<T>(event, (e) => handler(e.payload)),
 };
