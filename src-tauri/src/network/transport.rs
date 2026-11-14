@@ -13,6 +13,7 @@ use std::sync::{
 };
 use std::time::{Duration, Instant, UNIX_EPOCH};
 use tauri::{AppHandle, Emitter, Manager};
+use tauri_plugin_notification::NotificationExt;
 use tokio::fs::{File, OpenOptions};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncSeekExt, AsyncWrite, AsyncWriteExt, DuplexStream, ReadHalf, WriteHalf};
 use tokio::net::{TcpListener, TcpStream};
@@ -26,6 +27,26 @@ const HEADER_LEN: usize = 36;
 const MAGIC_BYTES: &[u8; 4] = b"RAYD";
 const PARALLEL_WORKERS: usize = 6; // IDM-style 6 parallel chunk workers for large files
 const PARALLEL_THRESHOLD_BYTES: u64 = 4 * 1024 * 1024; // 4 MB threshold for parallel multi-segment streaming
+pub const MAX_RELAY_TRANSFER_BYTES: u64 = 100 * 1024 * 1024; // 100 MB safety guard for VPS bandwidth
+
+pub fn notify_os(app: &AppHandle, title: &str, body: &str) {
+    let _ = app.notification().builder()
+        .title(title)
+        .body(body)
+        .show();
+}
+
+pub fn format_bytes_human(bytes: u64) -> String {
+    if bytes < 1024 {
+        format!("{bytes} B")
+    } else if bytes < 1024 * 1024 {
+        format!("{:.1} KB", bytes as f64 / 1024.0)
+    } else if bytes < 1024 * 1024 * 1024 {
+        format!("{:.1} MB", bytes as f64 / (1024.0 * 1024.0))
+    } else {
+        format!("{:.2} GB", bytes as f64 / (1024.0 * 1024.0 * 1024.0))
+    }
+}
 
 /// Forcefully pops up and focuses the main Raydrop window on the Win32 main UI thread,
 /// even if the app was minimized in the System Tray or behind another foreground application.
@@ -745,7 +766,19 @@ where
             target_directory: Some(saved_dir.clone()),
         }
     } else if trust_level == "trusted_auto_accept" {
-        popup_and_focus_main_window(&app);
+        info!(
+            "Auto-accepting incoming transfer session {} from trusted peer {} ({})",
+            hello.session_id, hello.sender_alias, hello.sender_device_id
+        );
+        let size_str = format_bytes_human(manifest.total_size_bytes);
+        notify_os(
+            &app,
+            "Raydrop Auto-Accept",
+            &format!(
+                "Receiving {} file(s) ({}) from {}",
+                manifest.total_files, size_str, hello.sender_alias
+            ),
+        );
         IncomingRequestDecision {
             accepted: true,
             target_directory: Some(default_dl.clone()),
@@ -949,6 +982,16 @@ where
                 eta_seconds: 0,
                 status: "completed".to_string(),
             },
+        );
+        notify_os(
+            &app,
+            "Raydrop Transfer Complete",
+            &format!(
+                "Received {} file(s) ({}) from {}",
+                manifest.total_files,
+                format_bytes_human(manifest.total_size_bytes),
+                hello.sender_alias
+            ),
         );
         tokio::time::sleep(Duration::from_millis(400)).await;
         return Ok(());
@@ -1210,6 +1253,16 @@ where
             eta_seconds: 0,
             status: "completed".to_string(),
         },
+    );
+    notify_os(
+        &app,
+        "Raydrop Transfer Complete",
+        &format!(
+            "Received {} file(s) ({}) from {}",
+            completed_files,
+            format_bytes_human(record.total_bytes),
+            record.peer_alias
+        ),
     );
     tokio::time::sleep(Duration::from_millis(400)).await;
     Ok(())
@@ -1663,6 +1716,16 @@ async fn run_outgoing_session(
 
     // 3. Guaranteed Fallback: Stream End-to-End Encrypted (Ed25519 + X25519 + ChaCha20-Poly1305)
     // frames over the active WSS Signaling tunnel (`RELAY_CONTROL`) when direct sockets are blocked by NAT/Firewall
+    if total_bytes > MAX_RELAY_TRANSFER_BYTES {
+        let err_msg = format!(
+            "Direct P2P socket was blocked by symmetric NAT/firewall. Transfer size ({}) exceeds the 100 MB relay guard to preserve server bandwidth. Connect both devices to the same Wi-Fi/LAN or use Tailscale for unlimited file sizes.",
+            format_bytes_human(total_bytes)
+        );
+        warn!("{err_msg}");
+        notify_os(&app, "Raydrop P2P Required", &err_msg);
+        return Err(err_msg);
+    }
+
     info!(
         "Direct socket blocked by NAT/Firewall for session {session_id}; using E2EE WSS stream tunnel to {}",
         fresh_contact.device_id
@@ -1706,6 +1769,7 @@ where
     R: AsyncRead + Unpin,
     W: AsyncWrite + Unpin,
 {
+    let total_files_count = files_with_paths.len();
     let session_id_bytes = *session_uuid.as_bytes();
     let my_dh = EphemeralDh::generate();
     let my_eph_hex = my_dh.public_hex();
@@ -2201,6 +2265,16 @@ where
             eta_seconds: 0,
             status: "completed".to_string(),
         },
+    );
+    notify_os(
+        &app,
+        "Raydrop Transfer Complete",
+        &format!(
+            "Successfully sent {} file(s) ({}) to {}",
+            total_files_count,
+            format_bytes_human(record.total_bytes),
+            record.peer_alias
+        ),
     );
     tokio::time::sleep(Duration::from_millis(400)).await;
     Ok(())

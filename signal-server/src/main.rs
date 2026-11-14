@@ -1366,6 +1366,10 @@ async fn handle_socket(socket: WebSocket, client_ip: String, state: ServerState)
                             warn!("Blocked spoofed RELAY_CONTROL from {authed_id}");
                             continue;
                         }
+                        if payload_json.len() > 300 * 1024 {
+                            warn!("Blocked oversized RELAY_CONTROL payload ({} bytes) from {authed_id}", payload_json.len());
+                            continue;
+                        }
                         if let Some(target) = state.peers.get(&target_device_id) {
                             let msg_str = json!({
                                 "type": "RELAY_CONTROL",

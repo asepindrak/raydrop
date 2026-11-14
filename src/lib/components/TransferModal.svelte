@@ -20,6 +20,7 @@
   let customTargetDir = '';
   let selectedPeerForCli = '';
   let peerSelectEl: HTMLSelectElement | null = null;
+  let alwaysAutoAccept = false;
 
   $: currentIncoming = $incomingRequestQueue[0] ?? null;
   $: if (currentIncoming && !customTargetDir) {
@@ -69,13 +70,27 @@
   async function respondIncoming(accepted: boolean) {
     if (!currentIncoming) return;
     const sid = currentIncoming.session_id;
+    const senderDeviceId = currentIncoming.sender_device_id;
+    const shouldTrust = accepted && alwaysAutoAccept;
+
     await raydropApi.respondTransferRequest(
       sid,
       accepted,
       accepted ? customTargetDir || $appSettings.download_dir : null
     );
+
+    if (shouldTrust) {
+      try {
+        await raydropApi.updateContactTrust(senderDeviceId, 'trusted_auto_accept');
+        contacts.set(await raydropApi.getContacts());
+      } catch (err) {
+        console.warn('Failed to update trust level:', err);
+      }
+    }
+
     incomingRequestQueue.update((q) => q.slice(1));
     customTargetDir = '';
+    alwaysAutoAccept = false;
   }
 
   async function confirmCliSend(targetDeviceId?: string) {
@@ -145,6 +160,20 @@
             <span>Browse</span>
           </button>
         </div>
+      </div>
+
+      <!-- Always Auto-Accept Option -->
+      <div class="mt-4 pt-3 border-t border-slate-800/80">
+        <label class="flex items-center gap-2.5 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            bind:checked={alwaysAutoAccept}
+            class="w-4 h-4 rounded bg-slate-950 border-slate-700 text-cyan-500 focus:ring-0 focus:ring-offset-0 cursor-pointer"
+          />
+          <span class="text-xs text-slate-300">
+            Always auto-accept future transfers from <strong class="text-white">{currentIncoming.sender_alias}</strong> (no prompt)
+          </span>
+        </label>
       </div>
 
       <div class="flex items-center justify-end gap-2.5 mt-6">
