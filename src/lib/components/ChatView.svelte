@@ -26,6 +26,7 @@
     User,
     ArrowUpRight,
     ArrowDownLeft,
+    ArrowLeft,
     Smile,
     Copy,
     Shield,
@@ -573,7 +574,7 @@
 
 <div class="flex h-full w-full bg-slate-900/40 border border-slate-800/80 rounded-2xl overflow-hidden backdrop-blur-xl">
   <!-- Left Column: Peer / Contacts Sidebar -->
-  <aside class="w-72 sm:w-80 border-r border-slate-800/80 flex flex-col bg-slate-950/60 shrink-0">
+  <aside class="w-full md:w-80 border-r border-slate-800/80 flex flex-col bg-slate-950/60 shrink-0 {$activeChatPeerId ? 'hidden md:flex' : 'flex'}">
     <!-- Search Bar -->
     <div class="p-3.5 border-b border-slate-800/80">
       <div class="relative">
@@ -669,7 +670,7 @@
   </aside>
 
   <!-- Right Column: Main Chat & Stream -->
-  <section class="flex-1 flex flex-col bg-slate-950/40 relative min-w-0">
+  <section class="flex-1 flex flex-col bg-slate-950/40 relative min-w-0 {!$activeChatPeerId ? 'hidden md:flex' : 'flex'}">
     {#if !activePeer}
       <div class="flex-1 flex flex-col items-center justify-center text-center p-8">
         <div class="w-16 h-16 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center mb-4 text-cyan-400 shadow-xl shadow-cyan-500/10">
@@ -682,51 +683,62 @@
       </div>
     {:else}
       <!-- Chat Header -->
-      <header class="p-3.5 px-5 border-b border-slate-800/80 bg-slate-950/70 flex items-center justify-between gap-3 shrink-0">
-        <div class="flex items-center gap-3 min-w-0">
+      <header class="p-3 sm:p-3.5 px-3.5 sm:px-5 border-b border-slate-800/80 bg-slate-950/70 flex items-center justify-between gap-2 sm:gap-3 shrink-0">
+        <div class="flex items-center gap-2 sm:gap-3 min-w-0">
+          <!-- Back button on mobile -->
+          <button
+            type="button"
+            on:click={() => activeChatPeerId.set(null)}
+            class="md:hidden p-1.5 -ml-1 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition shrink-0"
+            aria-label="Kembali ke kontak"
+            title="Kembali ke kontak"
+          >
+            <ArrowLeft class="w-5 h-5" />
+          </button>
+
           <div class="relative shrink-0">
-            <div class="w-9 h-9 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-xs text-cyan-300">
+            <div class="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-xs text-cyan-300">
               {activePeer.name.slice(0, 2).toUpperCase()}
             </div>
             {#if activePeer.isOnline}
-              <span class="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 border-2 border-slate-950 shadow-sm shadow-emerald-500/50"></span>
+              <span class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-emerald-500 border-2 border-slate-950 shadow-sm shadow-emerald-500/50"></span>
             {/if}
           </div>
 
           <div class="min-w-0">
-            <div class="flex items-center gap-2">
-              <h2 class="text-xs font-bold text-white truncate">{activePeer.name}</h2>
-              <span class="text-[10px] px-1.5 py-0.2 rounded bg-slate-800 text-slate-300 font-mono">
+            <div class="flex items-center gap-1.5 sm:gap-2">
+              <h2 class="text-xs font-bold text-white truncate max-w-[120px] sm:max-w-none">{activePeer.name}</h2>
+              <span class="text-[9px] sm:text-[10px] px-1 sm:px-1.5 py-0.2 rounded bg-slate-800 text-slate-300 font-mono">
                 {activePeer.networkType.toUpperCase()}
               </span>
               {#if isPeerBlocked}
-                <span class="text-[10px] px-1.5 py-0.2 rounded bg-rose-500/20 text-rose-300 font-mono font-bold">
+                <span class="text-[9px] sm:text-[10px] px-1 sm:px-1.5 py-0.2 rounded bg-rose-500/20 text-rose-300 font-mono font-bold">
                   BLOCKED
                 </span>
               {/if}
             </div>
-            <p class="text-[11px] text-slate-400 truncate font-mono">
+            <p class="text-[10px] sm:text-[11px] text-slate-400 truncate font-mono">
               {activePeer.email || activePeer.id}
             </p>
           </div>
         </div>
 
-        <div class="flex items-center gap-1.5">
+        <div class="flex items-center gap-1 sm:gap-1.5 shrink-0">
           <!-- Block / Unblock Button -->
           <button
             type="button"
             on:click={toggleBlockPeer}
-            class="px-2.5 py-1 rounded-xl text-xs font-semibold border transition flex items-center gap-1 {isPeerBlocked
+            class="px-2 sm:px-2.5 py-1 rounded-xl text-xs font-semibold border transition flex items-center gap-1 {isPeerBlocked
               ? 'bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border-emerald-500/30'
               : 'bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border-rose-500/20'}"
             title={isPeerBlocked ? 'Unblock this peer' : 'Block this peer'}
           >
             {#if isPeerBlocked}
               <ShieldCheck class="w-3.5 h-3.5" />
-              <span>Unblock</span>
+              <span class="hidden sm:inline">Unblock</span>
             {:else}
               <Ban class="w-3.5 h-3.5" />
-              <span>Block</span>
+              <span class="hidden sm:inline">Block</span>
             {/if}
           </button>
 
@@ -1052,18 +1064,18 @@
       {/if}
 
       <!-- Chat Input Area -->
-      <footer class="p-3.5 border-t border-slate-800/80 bg-slate-950/80 shrink-0">
+      <footer class="p-2 sm:p-3.5 border-t border-slate-800/80 bg-slate-950/80 shrink-0">
         <form
           on:submit|preventDefault={handleSendMessage}
-          class="flex items-end gap-2"
+          class="flex items-end gap-1.5 sm:gap-2"
         >
           <!-- Attachment Dropdown & Emoji Picker -->
-          <div class="flex items-center gap-1 shrink-0 pb-1">
+          <div class="flex items-center gap-0.5 sm:gap-1 shrink-0 pb-1">
             <button
               type="button"
               disabled={isPeerBlocked}
               on:click={() => (showEmojiPicker = !showEmojiPicker)}
-              class="p-2 rounded-xl text-slate-400 hover:text-amber-300 hover:bg-slate-900 border border-transparent hover:border-slate-800 transition disabled:opacity-40"
+              class="p-1.5 sm:p-2 rounded-xl text-slate-400 hover:text-amber-300 hover:bg-slate-900 border border-transparent hover:border-slate-800 transition disabled:opacity-40"
               title="Add Emoji"
             >
               <Smile class="w-4 h-4" />
@@ -1072,7 +1084,7 @@
               type="button"
               disabled={isPeerBlocked}
               on:click={handlePickFiles}
-              class="p-2 rounded-xl text-slate-400 hover:text-cyan-300 hover:bg-slate-900 border border-transparent hover:border-slate-800 transition disabled:opacity-40"
+              class="p-1.5 sm:p-2 rounded-xl text-slate-400 hover:text-cyan-300 hover:bg-slate-900 border border-transparent hover:border-slate-800 transition disabled:opacity-40"
               title="Attach Multiple Files (Images, Videos, Code, PDFs, Docs, etc.)"
             >
               <Paperclip class="w-4 h-4" />
@@ -1081,7 +1093,7 @@
               type="button"
               disabled={isPeerBlocked}
               on:click={handlePickFolder}
-              class="p-2 rounded-xl text-slate-400 hover:text-cyan-300 hover:bg-slate-900 border border-transparent hover:border-slate-800 transition disabled:opacity-40"
+              class="p-1.5 sm:p-2 rounded-xl text-slate-400 hover:text-cyan-300 hover:bg-slate-900 border border-transparent hover:border-slate-800 transition disabled:opacity-40"
               title="Attach Entire Folder"
             >
               <FolderUp class="w-4 h-4" />
@@ -1089,7 +1101,7 @@
           </div>
 
           <!-- Auto-expanding Input Textarea -->
-          <div class="flex-1 relative">
+          <div class="flex-1 relative min-w-0">
             <textarea
               bind:this={textareaEl}
               bind:value={messageInput}
@@ -1097,8 +1109,8 @@
               on:keydown={handleKeyDown}
               disabled={isPeerBlocked}
               rows="1"
-              placeholder={isPeerBlocked ? "Kontak ini diblokir" : "Type message, plans, code (Markdown supported)..."}
-              class="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500/60 focus:ring-1 focus:ring-cyan-500/30 resize-none max-h-36 transition font-sans disabled:opacity-40"
+              placeholder={isPeerBlocked ? "Kontak ini diblokir" : "Ketik pesan..."}
+              class="w-full px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500/60 focus:ring-1 focus:ring-cyan-500/30 resize-none max-h-36 transition font-sans disabled:opacity-40"
             ></textarea>
           </div>
 
@@ -1106,18 +1118,18 @@
           <button
             type="submit"
             disabled={isSending || isPeerBlocked || (!messageInput.trim() && attachingFiles.length === 0)}
-            class="px-4 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-xs shadow-lg shadow-cyan-500/20 transition-all flex items-center gap-1.5 shrink-0"
+            class="px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-xs shadow-lg shadow-cyan-500/20 transition-all flex items-center gap-1.5 shrink-0"
           >
             {#if isSending}
               <RefreshCw class="w-3.5 h-3.5 animate-spin" />
             {:else}
               <Send class="w-3.5 h-3.5" />
             {/if}
-            <span>Send</span>
+            <span class="hidden sm:inline">Send</span>
           </button>
         </form>
 
-        <div class="flex items-center justify-between text-[10px] text-slate-500 font-mono mt-2 px-1">
+        <div class="hidden sm:flex items-center justify-between text-[10px] text-slate-500 font-mono mt-2 px-1">
           <div class="flex items-center gap-2">
             <span>⚡ Markdown: `code`, **bold**, *italic*, - list</span>
             <span>•</span>

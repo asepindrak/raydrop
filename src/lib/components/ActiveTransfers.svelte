@@ -262,13 +262,13 @@
 
 <div class="flex flex-col h-full bg-slate-900/40 border border-slate-800/80 rounded-2xl overflow-hidden backdrop-blur-xl">
   <!-- Top Hub: Quick Transfer Action Bar & Drop Zone -->
-  <div class="p-5 border-b border-slate-800/80 bg-slate-950/60 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
+  <div class="p-3 sm:p-5 border-b border-slate-800/80 bg-slate-950/60 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 sm:gap-4">
     <!-- Action Buttons -->
-    <div class="flex items-center gap-2 sm:gap-3 shrink-0 flex-wrap">
+    <div class="grid grid-cols-2 sm:flex sm:items-center sm:flex-wrap gap-2 sm:gap-3 shrink-0">
       <button
         type="button"
         on:click={handlePickFiles}
-        class="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-white font-bold text-sm shadow-lg shadow-cyan-500/25 transition-all transform hover:-translate-y-0.5 active:translate-y-0"
+        class="col-span-2 sm:col-span-1 flex items-center justify-center gap-2 px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-white font-bold text-xs sm:text-sm shadow-lg shadow-cyan-500/25 transition-all transform hover:-translate-y-0.5 active:translate-y-0"
       >
         <Plus class="w-4 h-4 stroke-[2.5]" />
         <span>Send Files</span>
@@ -277,36 +277,36 @@
       <button
         type="button"
         on:click={handlePickFolder}
-        class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-200 hover:text-white font-semibold text-sm border border-slate-700/80 transition-all hover:-translate-y-0.5"
+        class="flex items-center justify-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-200 hover:text-white font-semibold text-xs sm:text-sm border border-slate-700/80 transition-all hover:-translate-y-0.5"
       >
         <FolderUp class="w-4 h-4 text-cyan-400" />
-        <span>Send Folder</span>
+        <span>Folder</span>
       </button>
 
       <button
         type="button"
         on:click={handleShareViaWeb}
-        class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-purple-600/80 to-pink-600/80 hover:from-purple-500 hover:to-pink-500 text-white font-semibold text-sm border border-purple-500/30 transition-all hover:-translate-y-0.5 shadow-lg shadow-purple-500/20"
+        class="flex items-center justify-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-gradient-to-r from-purple-600/80 to-pink-600/80 hover:from-purple-500 hover:to-pink-500 text-white font-semibold text-xs sm:text-sm border border-purple-500/30 transition-all hover:-translate-y-0.5 shadow-lg shadow-purple-500/20"
         title="Share files to phone or any device via QR code (no app needed)"
       >
         <QrCode class="w-4 h-4 text-purple-200" />
-        <span>Share to Phone</span>
+        <span>Web Share</span>
       </button>
 
       <button
         type="button"
         on:click={() => (showClipboardModal = true)}
-        class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600/80 to-purple-600/80 hover:from-indigo-500 hover:to-purple-500 text-white font-semibold text-sm border border-indigo-500/30 transition-all hover:-translate-y-0.5 shadow-lg shadow-indigo-500/20"
+        class="flex items-center justify-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-gradient-to-r from-indigo-600/80 to-purple-600/80 hover:from-indigo-500 hover:to-purple-500 text-white font-semibold text-xs sm:text-sm border border-indigo-500/30 transition-all hover:-translate-y-0.5 shadow-lg shadow-indigo-500/20"
         title="Sync text, links, or code directly to your other devices' clipboard"
       >
         <Clipboard class="w-4 h-4 text-indigo-200" />
-        <span>Sync Clipboard</span>
+        <span>Clipboard</span>
       </button>
 
       <button
         type="button"
         on:click={() => (showFolderSyncModal = true)}
-        class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600/80 to-teal-600/80 hover:from-emerald-500 hover:to-teal-500 text-white font-semibold text-sm border border-emerald-500/30 transition-all hover:-translate-y-0.5 shadow-lg shadow-emerald-500/20"
+        class="flex items-center justify-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-gradient-to-r from-emerald-600/80 to-teal-600/80 hover:from-emerald-500 hover:to-teal-500 text-white font-semibold text-xs sm:text-sm border border-emerald-500/30 transition-all hover:-translate-y-0.5 shadow-lg shadow-emerald-500/20"
         title="Mirror / sync whole folders directly to your trusted peers"
       >
         <FolderSync class="w-4 h-4 text-emerald-200" />
@@ -318,10 +318,10 @@
     <button
       type="button"
       on:click={handlePickFiles}
-      class="flex-1 max-w-2xl px-4 py-2.5 rounded-xl border border-dashed border-slate-700/80 hover:border-cyan-500/60 bg-slate-900/40 hover:bg-slate-900/80 transition-all cursor-pointer flex items-center justify-between gap-3 text-xs text-slate-400 group text-left"
+      class="flex-1 max-w-2xl px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl border border-dashed border-slate-700/80 hover:border-cyan-500/60 bg-slate-900/40 hover:bg-slate-900/80 transition-all cursor-pointer flex items-center justify-between gap-3 text-xs text-slate-400 group text-left"
       title="Click or drag files here to send"
     >
-      <div class="flex items-center gap-2.5 min-w-0">
+      <div class="flex items-center gap-2 sm:gap-2.5 min-w-0">
         <div class="w-7 h-7 rounded-lg bg-cyan-500/10 group-hover:bg-cyan-500/20 text-cyan-400 flex items-center justify-center shrink-0 transition-colors">
           <Upload class="w-4 h-4" />
         </div>
@@ -360,7 +360,7 @@
   </div>
 
   <!-- Filter Ribbon & Aggregate Metrics -->
-  <div class="px-5 py-3 border-b border-slate-800/80 flex items-center justify-between gap-3 bg-slate-950/40">
+  <div class="px-3 sm:px-5 py-2.5 sm:py-3 border-b border-slate-800/80 flex flex-wrap items-center justify-between gap-2.5 sm:gap-3 bg-slate-950/40">
     <!-- Filter Tabs: All / Received / Sent -->
     <div class="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800">
       <button
@@ -602,7 +602,7 @@
                   ></div>
                 </div>
 
-                <div class="flex items-center justify-between text-xs font-mono text-slate-400">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between text-xs font-mono text-slate-400 gap-1">
                   <span>{formatBytes(t.transferred_bytes)} / {formatBytes(t.total_bytes)} ({pct}%)</span>
                   {#if t.status === 'paused'}
                     <span class="text-amber-300">Checkpoint saved (.raypart) • Ready to resume</span>

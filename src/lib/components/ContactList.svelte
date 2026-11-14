@@ -216,22 +216,22 @@
 
 <div class="flex flex-col h-full bg-slate-900/40 border border-slate-800/80 rounded-2xl overflow-hidden">
   <!-- Navigation Tabs -->
-  <div class="p-4 border-b border-slate-800/80 flex items-center justify-between gap-3 bg-slate-900/60 backdrop-blur-xl">
-    <div class="flex items-center gap-2">
+  <div class="p-3 sm:p-4 border-b border-slate-800/80 flex flex-wrap items-center justify-between gap-2 sm:gap-3 bg-slate-900/60 backdrop-blur-xl">
+    <div class="flex items-center gap-1.5 sm:gap-2 flex-wrap">
       <button
         type="button"
         on:click={() => activeMainTab.set('transfers')}
-        class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-semibold border border-slate-700 transition-colors"
+        class="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-semibold border border-slate-700 transition-colors"
         title="Return to Transfers & Streams"
       >
         <ArrowLeft class="w-3.5 h-3.5 text-cyan-400" />
         <span>Transfers</span>
       </button>
 
-      <div class="flex items-center gap-1 bg-slate-950/70 p-1 rounded-xl border border-slate-800">
+      <div class="flex items-center gap-1 bg-slate-950/70 p-1 rounded-xl border border-slate-800 overflow-x-auto max-w-full">
         <button
           on:click={() => selectTab('devices')}
-          class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all {activeTab ===
+          class="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-semibold transition-all shrink-0 {activeTab ===
           'devices'
             ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
             : 'text-slate-400 hover:text-slate-200'}"
@@ -242,7 +242,7 @@
 
         <button
           on:click={() => selectTab('contacts')}
-          class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all {activeTab ===
+          class="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-semibold transition-all shrink-0 {activeTab ===
           'contacts'
             ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
             : 'text-slate-400 hover:text-slate-200'}"
@@ -253,7 +253,7 @@
 
         <button
           on:click={() => selectTab('lan')}
-          class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all {activeTab ===
+          class="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-semibold transition-all shrink-0 {activeTab ===
           'lan'
             ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
             : 'text-slate-400 hover:text-slate-200'}"
@@ -270,10 +270,11 @@
           errorMsg = '';
           showAddContactModal = true;
         }}
-        class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs transition-colors shadow-sm shadow-cyan-500/20"
+        class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs transition-colors shadow-sm shadow-cyan-500/20 shrink-0"
       >
         <UserPlus class="w-3.5 h-3.5" />
-        <span>Add by Email</span>
+        <span class="hidden sm:inline">Add by Email</span>
+        <span class="sm:hidden">Add</span>
       </button>
     {/if}
   </div>

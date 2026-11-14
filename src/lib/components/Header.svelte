@@ -58,21 +58,28 @@
   }
 </script>
 
-<header class="border-b border-slate-800/80 bg-slate-900/80 backdrop-blur-xl px-5 py-3 flex items-center justify-between gap-4 z-20">
+<header class="border-b border-slate-800/80 bg-slate-900/80 backdrop-blur-xl px-3 sm:px-5 py-2.5 sm:py-3 flex items-center justify-between gap-2 sm:gap-4 z-20 shrink-0">
   <!-- Brand & Identity (Left) -->
-  <div class="flex items-center gap-3 shrink-0">
+  <div class="flex items-center gap-2 sm:gap-3 shrink min-w-0">
     <img
       src="/icon.png"
       alt="Raydrop Icon"
-      class="w-9 h-9 rounded-xl shadow-lg shadow-cyan-500/20 object-contain p-0.5 bg-slate-900 border border-cyan-500/30"
+      class="w-7 h-7 sm:w-9 sm:h-9 rounded-xl shadow-lg shadow-cyan-500/20 object-contain p-0.5 bg-slate-900 border border-cyan-500/30 shrink-0"
     />
-    <div>
-      <div class="flex items-center gap-2">
-        <h1 class="text-base font-extrabold tracking-tight text-white font-display">Raydrop</h1>
+    <div class="min-w-0">
+      <div class="flex items-center gap-1.5 sm:gap-2">
+        <h1 class="text-sm sm:text-base font-extrabold tracking-tight text-white font-display truncate">Raydrop</h1>
+        
+        <!-- Online/Signaling Status Dot for Mobile -->
+        <span
+          class="md:hidden w-2 h-2 rounded-full shrink-0 {$networkInfo.signalingConnected ? 'bg-emerald-400' : 'bg-amber-400'}"
+          title={$networkInfo.signalingConnected ? 'Online (Connected to Signaling)' : 'Standby'}
+        ></span>
+
         <button
           type="button"
           on:click={() => checkForUpdates(true)}
-          class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white border border-slate-700 transition-colors flex items-center gap-1 cursor-pointer"
+          class="hidden sm:inline-flex text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white border border-slate-700 transition-colors items-center gap-1 cursor-pointer shrink-0"
           title="Click to check for software updates"
         >
           {#if $updateChecking}
@@ -85,7 +92,7 @@
           <button
             type="button"
             on:click={() => updateModalOpen.set(true)}
-            class="flex items-center gap-1 text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 shadow-sm shadow-cyan-500/20 animate-pulse transition-all cursor-pointer"
+            class="hidden sm:inline-flex items-center gap-1 text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 shadow-sm shadow-cyan-500/20 animate-pulse transition-all cursor-pointer shrink-0"
             title="Click to view update details and install"
           >
             <Sparkles class="w-3 h-3 text-cyan-400" />
@@ -94,7 +101,8 @@
         {/if}
       </div>
 
-      <div class="flex items-center gap-2 mt-0.5">
+      <!-- Identity line (Desktop only to prevent mobile header overflow) -->
+      <div class="hidden sm:flex items-center gap-2 mt-0.5">
         {#if $appSettings.user_email}
           <Mail class="w-3 h-3 text-cyan-400 shrink-0" />
           <span class="text-xs font-mono text-cyan-300 truncate max-w-[130px]" title={$appSettings.user_email}>
@@ -118,7 +126,7 @@
     </div>
   </div>
 
-  <!-- Center Segmented Navigation Tabs (Matching Filee / Landing Page style) -->
+  <!-- Center Segmented Navigation Tabs (Desktop only) -->
   <nav class="hidden md:flex items-center gap-1 bg-slate-950/80 p-1 rounded-2xl border border-slate-800/80 shadow-inner">
     <!-- 1. Transfers & Streams (Default Active Full Tab) -->
     <button
@@ -154,7 +162,7 @@
       {/if}
     </button>
 
-    <!-- 2. LAN Radar (Inactive Tab) -->
+    <!-- 3. LAN Radar (Inactive Tab) -->
     <button
       type="button"
       on:click={() => activeMainTab.set('lan')}
@@ -171,7 +179,7 @@
       {/if}
     </button>
 
-    <!-- 3. My Devices (Inactive Tab) -->
+    <!-- 4. My Devices (Inactive Tab) -->
     <button
       type="button"
       on:click={() => activeMainTab.set('devices')}
@@ -188,7 +196,7 @@
       {/if}
     </button>
 
-    <!-- 4. Contacts (Inactive Tab) -->
+    <!-- 5. Contacts (Inactive Tab) -->
     <button
       type="button"
       on:click={() => activeMainTab.set('contacts')}
@@ -207,8 +215,8 @@
   </nav>
 
   <!-- Status Badges & Quick Action Controls (Right) -->
-  <div class="flex items-center gap-2 shrink-0">
-    <!-- WAN STUN Status -->
+  <div class="flex items-center gap-1.5 sm:gap-2 shrink-0">
+    <!-- WAN STUN Status (Desktop only) -->
     <div
       class="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-xl border text-xs {$networkInfo.signalingConnected
         ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
@@ -221,11 +229,11 @@
       <span>{$networkInfo.signalingConnected ? 'Online' : 'Standby'}</span>
     </div>
 
-    <!-- Discoverability Toggle -->
+    <!-- Discoverability Toggle (Compact on mobile) -->
     <button
       type="button"
       on:click={toggleDiscoverable}
-      class="flex items-center gap-1.5 px-2.5 py-1 rounded-xl border text-xs font-semibold transition-all {$appSettings.discoverable
+      class="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-xl border text-xs font-semibold transition-all {$appSettings.discoverable
         ? 'bg-cyan-500/15 border-cyan-500/40 text-cyan-300'
         : 'bg-slate-800/60 border-slate-700 text-slate-400'}"
       title="Toggle whether nearby LAN peers can see this device"
@@ -235,7 +243,7 @@
           ? 'bg-cyan-400 animate-pulse'
           : 'bg-slate-500'}"
       ></span>
-      <span>{$appSettings.discoverable ? 'Visible' : 'Hidden'}</span>
+      <span class="hidden sm:inline">{$appSettings.discoverable ? 'Visible' : 'Hidden'}</span>
     </button>
 
     <!-- Account Sign In / Out -->
@@ -243,19 +251,20 @@
       <button
         type="button"
         on:click={handleLogout}
-        class="p-1.5 rounded-xl bg-slate-800/70 hover:bg-rose-500/20 border border-slate-700/70 hover:border-rose-500/30 text-slate-300 hover:text-rose-300 transition-colors"
+        class="p-1.5 sm:p-2 rounded-xl bg-slate-800/70 hover:bg-rose-500/20 border border-slate-700/70 hover:border-rose-500/30 text-slate-300 hover:text-rose-300 transition-colors"
         title="Sign Out ({$appSettings.user_email})"
       >
-        <LogOut class="w-4 h-4" />
+        <LogOut class="w-3.5 h-3.5 sm:w-4 sm:h-4" />
       </button>
     {:else}
       <button
         type="button"
         on:click={() => authModalOpen.set(true)}
-        class="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-white font-bold text-xs transition-colors shadow-sm shadow-cyan-500/20"
+        class="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-white font-bold text-xs transition-colors shadow-sm shadow-cyan-500/20"
+        title="Sign In to Sync Devices"
       >
         <LogIn class="w-3.5 h-3.5" />
-        <span>Sign In</span>
+        <span class="hidden sm:inline">Sign In</span>
       </button>
     {/if}
 
@@ -273,7 +282,7 @@
           console.warn('File picker canceled or error:', e);
         }
       }}
-      class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-white font-bold text-xs shadow-md shadow-cyan-500/20 transition-all hover:-translate-y-0.5 active:translate-y-0"
+      class="flex items-center gap-1 sm:gap-1.5 p-1.5 sm:px-3 sm:py-1.5 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-white font-bold text-xs shadow-md shadow-cyan-500/20 transition-all hover:-translate-y-0.5 active:translate-y-0"
       title="Select multiple files to send"
     >
       <Plus class="w-3.5 h-3.5 stroke-[2.5]" />
@@ -284,10 +293,10 @@
     <button
       type="button"
       on:click={() => settingsModalOpen.set(true)}
-      class="p-1.5 rounded-xl bg-slate-800/70 hover:bg-slate-700 border border-slate-700/70 text-slate-300 hover:text-white transition-colors"
+      class="p-1.5 sm:p-2 rounded-xl bg-slate-800/70 hover:bg-slate-700 border border-slate-700/70 text-slate-300 hover:text-white transition-colors"
       title="Open Raydrop Settings"
     >
-      <Settings class="w-4 h-4" />
+      <Settings class="w-3.5 h-3.5 sm:w-4 sm:h-4" />
     </button>
   </div>
 </header>
