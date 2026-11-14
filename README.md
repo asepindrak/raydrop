@@ -23,6 +23,7 @@
   <a href="#-download"><img src="https://img.shields.io/badge/Windows-10%20%2F%2011%20(x64)-0078D6?style=flat-square&logo=windows&logoColor=white" alt="Windows 10/11" /></a>
   <a href="#-download"><img src="https://img.shields.io/badge/macOS-Universal%20(M1--M4%20%2F%20Intel)-000000?style=flat-square&logo=apple&logoColor=white" alt="macOS Universal" /></a>
   <a href="#-download"><img src="https://img.shields.io/badge/Linux-deb%20%7C%20AppImage-FCC624?style=flat-square&logo=linux&logoColor=black" alt="Linux deb | AppImage" /></a>
+  <a href="#-download"><img src="https://img.shields.io/badge/Android-8.0%2B%20(ARM64)-3DDC84?style=flat-square&logo=android&logoColor=white" alt="Android 8.0+ (ARM64)" /></a>
 </p>
 
 ---
@@ -75,6 +76,13 @@ Unlike traditional file-sharing services that upload your files to third-party c
 - **Direct File Launch:** Open shared files directly from chat bubbles with system default apps or reveal them in Windows Explorer with 1 click.
 - **Zero Server Storage & Zero Server DB:** Chat history is stored 100% locally on each peer's private SQLite database. The server never stores chat messages or conversation logs.
 
+### 📋 Universal Clipboard, Folder Mirroring & Speed Controls (New in v1.2.5)
+- **Universal Clipboard Sharing:** Instantly share text, links, code snippets, or clipboard images across any connected device with one click or automatic synchronization.
+- **Precision Bandwidth Speed Limiter (QoS):** Cap outgoing and incoming transfer speeds (e.g. 10 MB/s, 25 MB/s, 50 MB/s, or Custom) to avoid saturating limited Wi-Fi connections or shared office networks.
+- **One-Way Folder Sync / Mirroring Mode:** Define persistent folder pairing tasks to automatically sync source changes to a remote destination folder without manual re-selection.
+- **Instant Web Share via QR Code:** Share files to any mobile phone or computer without installing the app; simply scan a dynamic QR code on the same Wi-Fi to download via a high-speed local HTTP streaming server.
+- **Mobile Responsive Layout & Android Support:** Fully responsive mobile layout featuring bottom navigation, touch-friendly transfer cards, and native Android APK builds.
+
 ---
 
 ## 🛡️ Security & Privacy Deep-Dive
@@ -108,14 +116,15 @@ The Raydrop signaling server (`signal-server/`) is hardened against unauthorized
 
 ## 📥 Download
 
-Pre-built native packages for **Windows**, **macOS**, and **Linux** are available on [GitHub Releases](https://github.com/asepindrak/raydrop/releases/latest) and the official live landing page at [raydrop.web.id](https://raydrop.web.id):
+Pre-built native packages for **Windows**, **macOS**, **Linux**, and **Android** are available on [GitHub Releases](https://github.com/asepindrak/raydrop/releases/latest) and the official live landing page at [raydrop.web.id](https://raydrop.web.id):
 
 | Platform | Format | Architecture | Description | Download |
 | :--- | :---: | :---: | :--- | :---: |
-| **Windows** | `.msi` | x64 (64-bit) | Official Windows 10/11 installer with desktop shortcut, background tray, and Explorer context menu integration. | [Download MSI](https://github.com/asepindrak/raydrop/releases/download/v1.2.4/Raydrop_1.2.4_x64_en-US.msi) |
-| **macOS** | `.dmg` | Universal (Apple Silicon & Intel) | Drag-and-drop installer for macOS 11.0+. Native Universal binary supporting Apple Silicon (M1-M4) & Intel. | [Download DMG](https://github.com/asepindrak/raydrop/releases/download/v1.2.4/Raydrop_1.2.4_universal.dmg) |
-| **Linux (Debian / Ubuntu)** | `.deb` | x64 (amd64) | Debian, Ubuntu, and Linux Mint package with application menu integration and native WebKitGTK runtime. | [Download DEB](https://github.com/asepindrak/raydrop/releases/download/v1.2.4/Raydrop_1.2.4_amd64.deb) |
-| **Linux (Universal)** | `.AppImage` | x64 (amd64) | Standalone portable executable for Fedora, Arch Linux, openSUSE, and any standard Linux distribution. | [Download AppImage](https://github.com/asepindrak/raydrop/releases/download/v1.2.4/Raydrop_1.2.4_amd64.AppImage) |
+| **Windows** | `.msi` | x64 (64-bit) | Official Windows 10/11 installer with desktop shortcut, background tray, and Explorer context menu integration. | [Download MSI](https://github.com/asepindrak/raydrop/releases/download/v1.2.5/Raydrop_1.2.5_x64_en-US.msi) |
+| **macOS** | `.dmg` | Universal (Apple Silicon & Intel) | Drag-and-drop installer for macOS 11.0+. Native Universal binary supporting Apple Silicon (M1-M4) & Intel. | [Download DMG](https://github.com/asepindrak/raydrop/releases/download/v1.2.5/Raydrop_1.2.5_universal.dmg) |
+| **Linux (Debian / Ubuntu)** | `.deb` | x64 (amd64) | Debian, Ubuntu, and Linux Mint package with application menu integration and native WebKitGTK runtime. | [Download DEB](https://github.com/asepindrak/raydrop/releases/download/v1.2.5/Raydrop_1.2.5_amd64.deb) |
+| **Linux (Universal)** | `.AppImage` | x64 (amd64) | Standalone portable executable for Fedora, Arch Linux, openSUSE, and any standard Linux distribution. | [Download AppImage](https://github.com/asepindrak/raydrop/releases/download/v1.2.5/Raydrop_1.2.5_amd64.AppImage) |
+| **Android** | `.apk` | ARM64 (`arm64-v8a`) | Native Android APK for phones and tablets. Direct high-speed local Wi-Fi transfer, mobile bottom navigation, and universal clipboard. | [Download APK](https://github.com/asepindrak/raydrop/releases/download/v1.2.5/Raydrop-arm64-v8a.apk) |
 
 👉 **[View All Release Assets on GitHub Releases](https://github.com/asepindrak/raydrop/releases/latest)** &bull; **[Visit Raydrop Website (raydrop.web.id)](https://raydrop.web.id)**
 

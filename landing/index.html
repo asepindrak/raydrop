@@ -727,10 +727,10 @@
     /* Download Section */
     .download-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
       justify-content: center;
       gap: 24px;
-      max-width: 1060px;
+      max-width: 1240px;
       margin: 0 auto;
     }
     .dl-card {
@@ -953,11 +953,11 @@
         </div>
 
         <p class="cta-meta">
-          <span>Windows &bull; macOS &bull; Linux</span>
+          <span>Windows &bull; macOS &bull; Linux &bull; Android</span>
           <span>&bull;</span>
           <span data-i18n="hero_meta_mit">Free & Open Source (MIT)</span>
           <span>&bull;</span>
-          <span id="heroReleaseVer">v1.2.4</span>
+          <span id="heroReleaseVer">v1.2.5</span>
         </p>
       </div>
 
@@ -1153,7 +1153,7 @@
       <div class="container">
         <header class="section-head">
           <h2 data-i18n="dl_title">Download Raydrop</h2>
-          <p data-i18n="dl_desc">Choose your operating system: Windows, macOS, or Linux. Always free and open-source.</p>
+          <p data-i18n="dl_desc">Available natively on Windows, macOS, Linux, and Android. Always free and open-source.</p>
         </header>
 
         <div class="download-grid">
@@ -1183,7 +1183,7 @@
 
             <div class="dl-meta">
               <span id="msiSize">Size: ~9.1 MB</span>
-              <span id="msiVersion">v1.2.4</span>
+              <span id="msiVersion">v1.2.5</span>
             </div>
           </div>
 
@@ -1213,7 +1213,7 @@
 
             <div class="dl-meta">
               <span id="dmgSize">Size: ~12 MB</span>
-              <span id="dmgVersion">v1.2.4</span>
+              <span id="dmgVersion">v1.2.5</span>
             </div>
           </div>
 
@@ -1248,7 +1248,37 @@
 
             <div class="dl-meta">
               <span id="linuxSize">Size: ~8.5 MB</span>
-              <span id="linuxVersion">v1.2.4</span>
+              <span id="linuxVersion">v1.2.5</span>
+            </div>
+          </div>
+
+          <!-- Android Card -->
+          <div class="dl-card" id="cardAndroid">
+            <span class="dl-tag" id="tagAndroid" style="display:none;" data-i18n="dl_tag_detected">Detected OS</span>
+            <div class="dl-head">
+              <div>
+                <div class="dl-os-icon">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M16.61 15.15c-.46 0-.84-.38-.84-.84s.38-.84.84-.84.84.38.84.84-.38.84-.84.84m-9.22 0c-.46 0-.84-.38-.84-.84s.38-.84.84-.84.84.38.84.84-.38.84-.84.84m9.52-5.02 1.67-2.89a.35.35 0 0 0-.13-.48.35.35 0 0 0-.48.13l-1.69 2.93a10.05 10.05 0 0 0-4.28-.94c-1.53 0-2.99.34-4.28.94L6.03 6.89a.35.35 0 0 0-.48-.13.35.35 0 0 0-.13.48l1.67 2.89C4.24 11.59 2.29 14.5 2 17.93h20c-.29-3.43-2.24-6.34-5.09-7.8"/>
+                  </svg>
+                </div>
+                <div class="dl-title">Android</div>
+                <div class="dl-desc" data-i18n="dl_android_desc">Android 8.0+ (ARM64). Native APK for phones and tablets.</div>
+              </div>
+            </div>
+
+            <a href="https://github.com/asepindrak/raydrop/releases/latest" id="dlApkBtn" class="btn btn-primary btn-large">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+              </svg>
+              <span>Download (.apk)</span>
+            </a>
+
+            <div class="dl-meta">
+              <span id="apkSize">Size: ~15 MB</span>
+              <span id="apkVersion">v1.2.5</span>
             </div>
           </div>
         </div>
@@ -1319,7 +1349,7 @@
         nav_download: "Download",
         nav_cta: "Download Free",
         badge_prefix: "New in ",
-        badge_suffix: ": P2P Markdown Chat & Media Sharing",
+        badge_suffix: ": Android APK, Folder Sync & Universal Clipboard",
         hero_kicker: "Ultra-Fast & Secure P2P File Transfer",
         hero_h1_part1: "Send. Receive.",
         hero_h1_gradient: "Without Limits.",
@@ -1358,12 +1388,13 @@
         card7_title: "Encrypted P2P Chat & Media Sharing",
         card7_desc: "Directly chat with contacts using rich Markdown and code formatting. Send photos, videos, documents, and multiple files right inside chat without any server database storage.",
         dl_title: "Download Raydrop",
-        dl_desc: "Available natively on Windows, macOS, and Linux. Always free and open-source.",
+        dl_desc: "Available natively on Windows, macOS, Linux, and Android. Always free and open-source.",
         dl_recommended: "Recommended",
         dl_tag_detected: "Detected OS",
         dl_win_desc: "Windows 10 & 11 (64-bit). MSI Installer with context menu and system tray.",
         dl_mac_desc: "macOS 11.0+. Universal DMG for Apple Silicon (M1-M4) & Intel Macs.",
         dl_linux_desc: "Ubuntu, Debian, Fedora, Arch & distros. Lightweight native desktop client.",
+        dl_android_desc: "Android 8.0+ (ARM64). Native APK for phones and tablets.",
         dl_older_prompt: "Looking for previous releases? ",
         dl_older_link: "View all releases on GitHub",
         footer_about: "Modern, zero-cloud peer-to-peer file transfer solution. End-to-end encrypted, lightning-fast for your daily workflow.",
@@ -1377,13 +1408,13 @@
       },
       id: {
         page_title: "Raydrop - Transfer File P2P Super Cepat & Aman (Zero Server)",
-        page_desc: "Aplikasi transfer file dan folder peer-to-peer (P2P) ultra cepat untuk Windows, macOS, dan Linux. Tanpa batas ukuran, tanpa upload ke cloud server, terenkripsi end-to-end, gratis dan open-source.",
+        page_desc: "Aplikasi transfer file dan folder peer-to-peer (P2P) ultra cepat untuk Windows, macOS, Linux, dan Android. Tanpa batas ukuran, tanpa upload ke cloud server, terenkripsi end-to-end, gratis dan open-source.",
         nav_how: "Cara Kerja",
         nav_features: "Fitur",
         nav_download: "Unduh",
         nav_cta: "Unduh Gratis",
         badge_prefix: "Baru di ",
-        badge_suffix: ": Chat P2P Markdown & Kirim Media",
+        badge_suffix: ": Rilis Android APK, Sinkronisasi Folder & Universal Clipboard",
         hero_kicker: "Aplikasi Transfer File P2P Tercepat & Teraman",
         hero_h1_part1: "Kirim. Terima.",
         hero_h1_gradient: "Tanpa Batas.",
@@ -1422,12 +1453,13 @@
         card7_title: "Chat P2P Terenkripsi & Kirim Media",
         card7_desc: "Kirim pesan langsung ke kontak dengan format Markdown dan kodingan. Kirim foto, video, dokumen, dan banyak file sekaligus langsung di dalam chat tanpa simpan database di server.",
         dl_title: "Unduh Raydrop",
-        dl_desc: "Tersedia secara native untuk Windows, macOS, dan Linux. Selalu gratis dan open-source.",
+        dl_desc: "Tersedia secara native untuk Windows, macOS, Linux, dan Android. Selalu gratis dan open-source.",
         dl_recommended: "Disarankan",
         dl_tag_detected: "OS Terdeteksi",
         dl_win_desc: "Windows 10 & 11 (64-bit). Installer MSI dengan integrasi menu klik kanan dan system tray.",
         dl_mac_desc: "macOS 11.0+. Universal DMG untuk Apple Silicon (M1-M4) dan Mac Intel.",
         dl_linux_desc: "Ubuntu, Debian, Fedora, Arch & distro Linux. Aplikasi native ringan berbasis WebKitGTK.",
+        dl_android_desc: "Android 8.0+ (ARM64). APK native untuk HP dan tablet.",
         dl_older_prompt: "Mencari rilis sebelumnya? ",
         dl_older_link: "Lihat semua rilis di GitHub",
         footer_about: "Solusi transfer file peer-to-peer modern, zero server cloud, aman terenkripsi, dan berkecepatan tinggi untuk kebutuhan kerja harian Anda.",
@@ -1524,13 +1556,19 @@
     function detectUserOS() {
       const ua = navigator.userAgent || '';
       const platform = navigator.platform || '';
+      if (/Android/i.test(ua)) return 'android';
       if (/Macintosh|MacIntel|MacPPC|Mac68K/i.test(platform) || /Mac OS X/i.test(ua)) return 'mac';
-      if (/Linux/i.test(platform) || (/Linux/i.test(ua) && !/Android/i.test(ua))) return 'linux';
+      if (/Linux/i.test(platform) || /Linux/i.test(ua)) return 'linux';
       return 'windows';
     }
 
     const userOS = detectUserOS();
-    if (userOS === 'mac') {
+    if (userOS === 'android') {
+      const card = document.getElementById('cardAndroid');
+      if (card) card.classList.add('featured');
+      const tag = document.getElementById('tagAndroid');
+      if (tag) tag.style.display = 'block';
+    } else if (userOS === 'mac') {
       const card = document.getElementById('cardMac');
       if (card) card.classList.add('featured');
       const tag = document.getElementById('tagMac');
@@ -1552,7 +1590,7 @@
         const res = await fetch('https://api.github.com/repos/asepindrak/raydrop/releases/latest');
         if (!res.ok) return;
         const data = await res.json();
-        currentTag = data.tag_name || 'v1.2.4';
+        currentTag = data.tag_name || 'v1.2.5';
         
         // Update texts
         document.getElementById('badgeText').innerText = translations[currentLang].badge_prefix + currentTag + translations[currentLang].badge_suffix;
@@ -1561,12 +1599,14 @@
         if (document.getElementById('msiVersion')) document.getElementById('msiVersion').innerText = verLabel;
         if (document.getElementById('dmgVersion')) document.getElementById('dmgVersion').innerText = verLabel;
         if (document.getElementById('linuxVersion')) document.getElementById('linuxVersion').innerText = verLabel;
+        if (document.getElementById('apkVersion')) document.getElementById('apkVersion').innerText = verLabel;
 
         // Assets
         const msiAsset = data.assets.find(a => a.name.endsWith('.msi'));
         const dmgAsset = data.assets.find(a => a.name.endsWith('.dmg'));
         const debAsset = data.assets.find(a => a.name.endsWith('.deb'));
         const appImageAsset = data.assets.find(a => a.name.endsWith('.AppImage'));
+        const apkAsset = data.assets.find(a => a.name.endsWith('.apk'));
 
         const sizePrefix = currentLang === 'id' ? 'Ukuran: ' : 'Size: ';
 
@@ -1592,10 +1632,19 @@
           document.getElementById('dlAppImageBtn').href = appImageAsset.browser_download_url;
         }
 
+        if (apkAsset) {
+          document.getElementById('dlApkBtn').href = apkAsset.browser_download_url;
+          const mb = (apkAsset.size / (1024 * 1024)).toFixed(1);
+          document.getElementById('apkSize').innerText = sizePrefix + mb + ' MB';
+        }
+
         // Hero CTA smart link to detected OS asset
         const heroBtn = document.getElementById('primaryHeroDlBtn');
         const heroText = document.getElementById('heroDlText');
-        if (userOS === 'mac' && dmgAsset) {
+        if (userOS === 'android' && apkAsset) {
+          heroBtn.href = apkAsset.browser_download_url;
+          heroText.innerText = (currentLang === 'id' ? 'Unduh untuk Android (.apk)' : 'Download for Android (.apk)');
+        } else if (userOS === 'mac' && dmgAsset) {
           heroBtn.href = dmgAsset.browser_download_url;
           heroText.innerText = (currentLang === 'id' ? 'Unduh untuk macOS (.dmg)' : 'Download for macOS (.dmg)');
         } else if (userOS === 'linux' && (debAsset || appImageAsset)) {
