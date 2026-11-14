@@ -264,7 +264,7 @@
   <!-- Top Hub: Quick Transfer Action Bar & Drop Zone -->
   <div class="p-5 border-b border-slate-800/80 bg-slate-950/60 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
     <!-- Action Buttons -->
-    <div class="flex items-center gap-3 shrink-0">
+    <div class="flex items-center gap-2 sm:gap-3 shrink-0 flex-wrap">
       <button
         type="button"
         on:click={handlePickFiles}

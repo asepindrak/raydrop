@@ -11,7 +11,7 @@
   import TraySettings from "./lib/components/TraySettings.svelte";
   import AuthModal from "./lib/components/AuthModal.svelte";
   import UpdateModal from "./lib/components/UpdateModal.svelte";
-  import { Upload, X } from "lucide-svelte";
+  import { Upload, X, Zap, MessageSquare, Wifi, Users } from "lucide-svelte";
   import {
     appSettings,
     deviceCryptoMeta,
@@ -32,10 +32,12 @@
     chatToasts,
     addChatToast,
     removeChatToast,
+    totalUnreadCount,
   } from "./lib/stores/chat";
-  import { contacts } from "./lib/stores/contacts";
+  import { contacts, lanContacts } from "./lib/stores/contacts";
   import {
     transfers,
+    activeTransfers,
     applyTransferProgress,
     upsertTransferRecord,
   } from "./lib/stores/transfers";
@@ -333,7 +335,7 @@
   <Header />
 
   <!-- Main View: FULL width & height for Transfers & Streams, or active tab -->
-  <main class="flex-1 w-full p-4 overflow-hidden relative z-10 flex flex-col min-h-0">
+  <main class="flex-1 w-full p-2 sm:p-4 pb-16 md:pb-4 overflow-hidden relative z-10 flex flex-col min-h-0">
     <div class="h-full w-full {$activeMainTab === 'transfers' ? 'flex flex-col' : 'hidden'}">
       <ActiveTransfers />
     </div>
@@ -428,4 +430,74 @@
   <TraySettings />
   <AuthModal />
   <UpdateModal />
+
+  <!-- Mobile Bottom Navigation Bar (md:hidden) -->
+  <nav class="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-slate-950/95 border-t border-slate-800/90 backdrop-blur-xl px-2 py-1.5 flex items-center justify-around shadow-2xl">
+    <!-- 1. Transfers -->
+    <button
+      type="button"
+      on:click={() => activeMainTab.set('transfers')}
+      class="flex flex-col items-center gap-0.5 px-3 py-1 rounded-xl transition-all {$activeMainTab === 'transfers'
+        ? 'text-cyan-400 font-bold'
+        : 'text-slate-400 hover:text-slate-200'}"
+    >
+      <div class="relative">
+        <Zap class="w-5 h-5" />
+        {#if $activeTransfers.length > 0}
+          <span class="absolute -top-1 -right-2 w-3.5 h-3.5 rounded-full bg-cyan-400 text-slate-950 text-[9px] font-bold flex items-center justify-center animate-pulse">
+            {$activeTransfers.length}
+          </span>
+        {/if}
+      </div>
+      <span class="text-[10px]">Transfers</span>
+    </button>
+
+    <!-- 2. Chat -->
+    <button
+      type="button"
+      on:click={() => activeMainTab.set('chat')}
+      class="flex flex-col items-center gap-0.5 px-3 py-1 rounded-xl transition-all {$activeMainTab === 'chat'
+        ? 'text-cyan-400 font-bold'
+        : 'text-slate-400 hover:text-slate-200'}"
+    >
+      <div class="relative">
+        <MessageSquare class="w-5 h-5" />
+        {#if $totalUnreadCount > 0}
+          <span class="absolute -top-1 -right-2 w-3.5 h-3.5 rounded-full bg-rose-500 text-white text-[9px] font-bold flex items-center justify-center animate-pulse">
+            {$totalUnreadCount}
+          </span>
+        {/if}
+      </div>
+      <span class="text-[10px]">Chat</span>
+    </button>
+
+    <!-- 3. LAN Radar -->
+    <button
+      type="button"
+      on:click={() => activeMainTab.set('lan')}
+      class="flex flex-col items-center gap-0.5 px-3 py-1 rounded-xl transition-all {$activeMainTab === 'lan'
+        ? 'text-cyan-400 font-bold'
+        : 'text-slate-400 hover:text-slate-200'}"
+    >
+      <div class="relative">
+        <Wifi class="w-5 h-5" />
+        {#if $lanContacts.length > 0}
+          <span class="absolute -top-1 -right-2 w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+        {/if}
+      </div>
+      <span class="text-[10px]">Radar</span>
+    </button>
+
+    <!-- 4. Contacts -->
+    <button
+      type="button"
+      on:click={() => activeMainTab.set('contacts')}
+      class="flex flex-col items-center gap-0.5 px-3 py-1 rounded-xl transition-all {$activeMainTab === 'contacts'
+        ? 'text-cyan-400 font-bold'
+        : 'text-slate-400 hover:text-slate-200'}"
+    >
+      <Users class="w-5 h-5" />
+      <span class="text-[10px]">Peers</span>
+    </button>
+  </nav>
 </div>

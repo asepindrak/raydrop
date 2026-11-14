@@ -119,7 +119,7 @@
   </div>
 
   <!-- Center Segmented Navigation Tabs (Matching Filee / Landing Page style) -->
-  <nav class="flex items-center gap-1 bg-slate-950/80 p-1 rounded-2xl border border-slate-800/80 shadow-inner">
+  <nav class="hidden md:flex items-center gap-1 bg-slate-950/80 p-1 rounded-2xl border border-slate-800/80 shadow-inner">
     <!-- 1. Transfers & Streams (Default Active Full Tab) -->
     <button
       type="button"
